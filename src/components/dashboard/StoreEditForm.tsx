@@ -5,14 +5,14 @@ import { Id, Doc } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { Upload, Camera, X, Plus, Trash2, ChevronsUpDown, Check, MapPin } from "lucide-react";
 import { Reorder } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "../ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "../ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { worldLocations } from "../../data/worldLocations";
 import { storeTypes, storeCategories } from "../../data/storeCategories";
 import { OpeningHoursInput } from './OpeningHoursInput';
-import { Switch } from "@/components/ui/switch";
+import { Switch } from "../ui/switch";
 
 type StoreWithImageUrl = Doc<"stores"> & { imageUrl: string | null; galleryImageUrls?: (string | null)[] };
 

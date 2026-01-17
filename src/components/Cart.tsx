@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { PiPayment } from './PiPayment';
 import { toast } from 'sonner';
-import { Button } from "@/components/ui/button";
+import { Button } from "./ui/button";
 import type { CartItem } from '../context/CartContext'; export type { CartItem };
 import { X, Trash2, ShoppingCart, XCircle, AlertTriangle, Check } from 'lucide-react';
 import { useQuery, useMutation } from 'convex/react';
@@ -10,8 +10,8 @@ import { Id } from '../../convex/_generated/dataModel';
 import { DiscountCodeInput } from './DiscountCodeInput';
 import { formatPiPrice } from '../lib/utils';
 import { useAuth } from '../hooks/useAuth';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "./ui/command";
 import { usePi } from '../hooks/usePi';  // Add this to directly access isInitialized/user for logs
 
 // Define a type for the successful discount object from the backend

@@ -5,9 +5,9 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Edit, Trash2, Home, Briefcase, ChevronsUpDown, Check, MapPin } from "lucide-react";
 import { worldLocations } from "../../data/worldLocations";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Button } from "../ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "../ui/command";
 
 const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
     <div className={`bg-gray-800 border border-gray-700 rounded-2xl ${className}`}>{children}</div>
