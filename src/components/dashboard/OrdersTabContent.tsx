@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { Doc, Id } from '../../../convex/_generated/dataModel';
 import { toast } from 'sonner';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '../ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -14,14 +14,14 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+} from "../ui/dialog";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
+import { Label } from "../ui/label";
 import { Loader2, User, Truck, TicketPercent, MapPin, Package, MessageSquare, Search } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth';
 import { NavigateFunction } from 'react-router-dom';
-import { Input } from '@/components/ui/input';
-import { useDebounce } from '@/hooks/useDebounce';
+import { Input } from '../ui/input';
+import { useDebounce } from '../../hooks/useDebounce';
 
 function OrdersTabSkeleton() {
   return (

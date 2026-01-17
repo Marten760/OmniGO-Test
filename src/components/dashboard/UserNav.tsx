@@ -5,11 +5,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from '../ui/dropdown-menu';
+import { Button } from '../ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { LogOut } from 'lucide-react';
-import { SignOutButton } from '@/SignOutButton';
+import { SignOutButton } from '../../SignOutButton';
 import { useAuth } from '../../hooks/useAuth';
 
 const getInitials = (name?: string | null) => {

@@ -5,11 +5,11 @@ import { Doc, Id } from '../../../convex/_generated/dataModel';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
 import { Loader2, User, Check, X, UserX, UserCheck, Briefcase, UserPlus, MessageSquare, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { NavigateFunction, useNavigate } from 'react-router-dom';
 import {
   AlertDialog,
@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "../ui/alert-dialog";
 
 // Extend the profile type to include the generated URL from the backend
 type ProfileWithImage = Doc<"userProfiles"> & { profileImageUrl: string | null };

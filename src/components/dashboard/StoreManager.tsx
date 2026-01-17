@@ -5,7 +5,7 @@ import { formatPiPrice } from '../../lib/utils';
 import { NavigateFunction } from 'react-router-dom';
 import { StoreEditForm } from './StoreEditForm';
 import { StoreAnalyticsDashboard } from './StoreAnalyticsDashboard';
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "../ui/alert-dialog";
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';

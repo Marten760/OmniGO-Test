@@ -8,8 +8,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
+} from '../ui/dropdown-menu';
+import { Button } from '../ui/button';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { Id, Doc } from '../../../convex/_generated/dataModel';

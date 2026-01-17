@@ -3,8 +3,8 @@ import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Doc, Id } from '../../../convex/_generated/dataModel';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { Loader2, Save, Minus, Plus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
