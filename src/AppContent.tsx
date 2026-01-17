@@ -25,7 +25,7 @@ import { ClearCartConfirmation } from "./components/ClearCartConfirmation";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "./components/ui/button";
 
 interface AppContentProps {
   sessionToken: string | null;
