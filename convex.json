@@ -1,0 +1,9 @@
+{
+  "node": {
+    "externalPackages": [
+      "@convex-dev/auth",
+      "pi-backend",
+      "@stellar/stellar-sdk"
+    ]
+  }
+}

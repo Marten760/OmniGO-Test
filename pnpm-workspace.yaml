@@ -1,0 +1,4 @@
+ignoredBuiltDependencies:
+  - '@stellar/stellar-sdk'
+  - esbuild
+  - sodium-native
