@@ -27,10 +27,10 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-} from "@/components/ui/card";
+} from "./ui/card";
 import { ProfileInformationView } from "./Account/ProfileInformationView";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { Label } from "./ui/label";
+import { Switch } from "./ui/switch";
 import { AddressesView } from "./Account/AddressesView";
 import { NotificationsView } from "./Account/NotificationsView";
 import { FavoritesView } from "./Account/FavoritesView";
