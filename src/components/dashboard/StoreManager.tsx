@@ -28,8 +28,8 @@ import { MarketingTabContent } from './MarketingTabContent';
 import { PayoutsTabContent } from './PayoutsTabContent'; 
 import { StatCard } from './StatCard';
 
-import { useAuth } from '@/hooks/useAuth';
-import { usePi } from '@/hooks/usePi';
+import { useAuth } from '../../hooks/useAuth';
+import { usePi } from '../../hooks/usePi';
 type StoreWithImageUrl = Doc<"stores"> & { imageUrl: string | null };
 
 interface StoreManagerProps {

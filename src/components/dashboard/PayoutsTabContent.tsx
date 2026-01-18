@@ -1,7 +1,7 @@
 import { useQuery, useAction, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { useAuth } from '@/hooks/useAuth';
-import { usePi } from '@/hooks/usePi';
+import { useAuth } from '../../hooks/useAuth';
+import { usePi } from '../../hooks/usePi';
 import { Id } from '../../../convex/_generated/dataModel';
 import { AlertCircle, CheckCircle2, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
