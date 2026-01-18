@@ -4,7 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { Doc, Id } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { ArrowLeft, Heart, Star, Store, Package, Loader2, ArrowRight } from "lucide-react";
-import { formatPiPrice } from "@/lib/utils";
+import { formatPiPrice } from "../../lib/utils";
 
 type StoreWithUrl = Doc<"stores"> & { logoImageUrl: string | null; galleryImageUrl: string | null; };
 type ProductWithUrl = Doc<"products"> & { imageUrls: (string | null)[]; storeName: string; storeId: Id<"stores">; };

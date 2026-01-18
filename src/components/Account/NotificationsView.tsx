@@ -3,8 +3,8 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCheck, Package, TicketPercent, Settings } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Switch } from "../ui/switch";
 
 const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
     <div className={`bg-gray-800 border border-gray-700 rounded-2xl ${className}`}>{children}</div>

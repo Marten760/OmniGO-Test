@@ -1,9 +1,9 @@
 import { toast } from "sonner";
 import { ArrowLeft, Palette, Globe, Bell, LogOut, Sun, Moon, Laptop } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { SignOutButton } from "@/SignOutButton";
-import { useTheme } from "@/context/ThemeProvider";
-import { cn } from "@/lib/utils";
+import { Switch } from "../ui/switch";
+import { SignOutButton } from "../../SignOutButton";
+import { useTheme } from "../../context/ThemeProvider";
+import { cn } from "../../lib/utils";
 
 export function SettingsView({ onBack, onLogout }: { onBack: () => void, onLogout: () => void }) {
     const { theme, setTheme } = useTheme();
