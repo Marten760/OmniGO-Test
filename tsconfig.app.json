@@ -25,5 +25,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "convex/drivers.ts", "convex/chat.ts", "convex/TimeContext.tsx", "convex/time.ts"]
+  "include": ["src", "convex/drivers.ts", "convex/chat.ts", "convex/TimeContext.tsx", "convex/time.ts", "convex/reports.ts"]
 }

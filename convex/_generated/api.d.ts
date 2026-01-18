@@ -29,6 +29,7 @@ import type * as presence from "../presence.js";
 import type * as productCategories from "../productCategories.js";
 import type * as products from "../products.js";
 import type * as promotions from "../promotions.js";
+import type * as reports from "../reports.js";
 import type * as reviews from "../reviews.js";
 import type * as sampleData from "../sampleData.js";
 import type * as search from "../search.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   productCategories: typeof productCategories;
   products: typeof products;
   promotions: typeof promotions;
+  reports: typeof reports;
   reviews: typeof reviews;
   sampleData: typeof sampleData;
   search: typeof search;

@@ -206,7 +206,8 @@ const applicationTables = {
       v.literal("preparing"),
       v.literal("out_for_delivery"),
       v.literal("delivered"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
+      v.literal("disputed")
     ),
     driverId: v.optional(v.id("users")), // The user ID of the assigned driver
     customerName: v.optional(v.string()), // Add customer name to the order
@@ -219,6 +220,7 @@ const applicationTables = {
     piPaymentId: v.optional(v.string()), // Link to Pi payment
     txid: v.optional(v.string()), // Pi blockchain transaction ID
     paymentRecordId: v.optional(v.id("piPayments")), // Link to the internal payment record
+    scheduledPayoutId: v.optional(v.id("_scheduled_functions")), // ID of the scheduled payout job
   })
     .index("by_user", ["userId"])
     .index("by_store_creation_time", ["storeId"]) // Renamed for clarity and removed _creationTime
@@ -266,6 +268,19 @@ const applicationTables = {
     endDate: v.string(), // ISO 8601 format
     status: v.union(v.literal("active"), v.literal("draft"), v.literal("archived")),
   })
+    .index("by_store", ["storeId"]),
+
+  reports: defineTable({
+    orderId: v.id("orders"),
+    userId: v.id("users"), // The customer reporting
+    storeId: v.id("stores"),
+    reason: v.string(),
+    description: v.string(),
+    imageIds: v.optional(v.array(v.id("_storage"))),
+    status: v.union(v.literal("open"), v.literal("resolved"), v.literal("rejected")),
+    resolution: v.optional(v.string()),
+  })
+    .index("by_order", ["orderId"])
     .index("by_store", ["storeId"]),
 
   notifications: defineTable({

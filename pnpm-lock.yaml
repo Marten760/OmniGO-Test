@@ -78,11 +78,11 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       convex:
-        specifier: ^1.31.3
-        version: 1.31.3(react@19.2.0)
+        specifier: ^1.31.5
+        version: 1.31.5(react@19.2.0)
       convex-helpers:
         specifier: ^0.1.104
-        version: 0.1.104(@standard-schema/spec@1.0.0)(convex@1.31.3(react@19.2.0))(react@19.2.0)(typescript@5.7.3)
+        version: 0.1.104(@standard-schema/spec@1.0.0)(convex@1.31.5(react@19.2.0))(react@19.2.0)(typescript@5.7.3)
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -1743,8 +1743,8 @@ packages:
       zod:
         optional: true
 
-  convex@1.31.3:
-    resolution: {integrity: sha512-SkpLjhFFnml2xKB4vNOaZ+MtqyhVmDdk5AIF2m8rW8Z7nZsMtuO1Tpn2BnDHCysZkZPJj9xopnsF5RtAINQ0Eg==}
+  convex@1.31.5:
+    resolution: {integrity: sha512-E1IuJKFwMCHDToNGukBPs6c7RFaarR3t8chLF9n98TM5/Tgmj8lM6l7sKM1aJ3VwqGaB4wbeUAPY8osbCOXBhQ==}
     engines: {node: '>=18.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -4914,15 +4914,15 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  convex-helpers@0.1.104(@standard-schema/spec@1.0.0)(convex@1.31.3(react@19.2.0))(react@19.2.0)(typescript@5.7.3):
+  convex-helpers@0.1.104(@standard-schema/spec@1.0.0)(convex@1.31.5(react@19.2.0))(react@19.2.0)(typescript@5.7.3):
     dependencies:
-      convex: 1.31.3(react@19.2.0)
+      convex: 1.31.5(react@19.2.0)
     optionalDependencies:
       '@standard-schema/spec': 1.0.0
       react: 19.2.0
       typescript: 5.7.3
 
-  convex@1.31.3(react@19.2.0):
+  convex@1.31.5(react@19.2.0):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.6.2

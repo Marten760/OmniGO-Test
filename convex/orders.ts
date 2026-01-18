@@ -178,6 +178,20 @@ export const updateOrderStatus = mutation({
           isArchived: true,
         });
       }
+
+      // --- ESCROW LOGIC: SCHEDULE AUTO-RELEASE ---
+      // Instead of releasing immediately, we schedule it for 48 hours later.
+      const commissionRateString = process.env.APP_COMMISSION_RATE || '0.05';
+      const appCommissionRate = parseFloat(commissionRateString);
+      const payoutAmount = order.totalAmount * (1 - appCommissionRate);
+
+      // Schedule payout for 48 hours from now
+      const jobId = await ctx.scheduler.runAfter(48 * 60 * 60 * 1000, internal.paymentsActions.payoutToStore, {
+        storeId: order.storeId,
+        amount: payoutAmount,
+        orderId: args.orderId,
+      });
+      await ctx.db.patch(args.orderId, { scheduledPayoutId: jobId });
     }
 
     return { success: true };
@@ -351,5 +365,89 @@ export const createOrderFromPayment = internalMutation({
     }
 
     return orderId;
+  },
+});
+
+export const confirmOrderReceipt = mutation({
+  args: {
+    tokenIdentifier: v.string(),
+    orderId: v.id("orders"),
+  },
+  handler: async (ctx, args) => {
+    const user = await validateToken(ctx, args.tokenIdentifier);
+    const order = await ctx.db.get(args.orderId);
+
+    if (!order || order.userId !== user._id) {
+      throw new ConvexError("Order not found or unauthorized.");
+    }
+
+    if (order.status !== 'delivered') {
+      throw new ConvexError("Order must be marked as delivered first.");
+    }
+
+    // Cancel the scheduled 48h payout if it exists
+    if (order.scheduledPayoutId) {
+      await ctx.scheduler.cancel(order.scheduledPayoutId);
+    }
+
+    // Release funds immediately
+    const commissionRateString = process.env.APP_COMMISSION_RATE || '0.05';
+    const appCommissionRate = parseFloat(commissionRateString);
+    const payoutAmount = order.totalAmount * (1 - appCommissionRate);
+
+    await ctx.scheduler.runAfter(0, internal.paymentsActions.payoutToStore, {
+      storeId: order.storeId,
+      amount: payoutAmount,
+      orderId: args.orderId,
+    });
+
+    // We could add a 'completed' status here if desired, but 'delivered' + payout implies completion.
+    // For now, we just ensure the payout happens now.
+    await ctx.db.patch(args.orderId, { scheduledPayoutId: undefined }); // Clear the job ID
+
+    return { success: true };
+  },
+});
+
+export const createDispute = mutation({
+  args: {
+    tokenIdentifier: v.string(),
+    orderId: v.id("orders"),
+    reason: v.string(),
+    description: v.string(),
+    imageIds: v.optional(v.array(v.id("_storage"))),
+  },
+  handler: async (ctx, args) => {
+    const user = await validateToken(ctx, args.tokenIdentifier);
+    const order = await ctx.db.get(args.orderId);
+
+    if (!order || order.userId !== user._id) {
+      throw new ConvexError("Order not found or unauthorized.");
+    }
+
+    if (order.status !== 'delivered') {
+      throw new ConvexError("You can only report issues after the order is marked delivered.");
+    }
+
+    // 1. Cancel the auto-release payout
+    if (order.scheduledPayoutId) {
+      await ctx.scheduler.cancel(order.scheduledPayoutId);
+    }
+
+    // 2. Update order status to DISPUTED
+    await ctx.db.patch(args.orderId, { status: 'disputed', scheduledPayoutId: undefined });
+
+    // 3. Create the report record
+    await ctx.db.insert("reports", {
+      orderId: args.orderId,
+      userId: user._id,
+      storeId: order.storeId,
+      reason: args.reason,
+      description: args.description,
+      imageIds: args.imageIds,
+      status: 'open',
+    });
+
+    return { success: true };
   },
 });

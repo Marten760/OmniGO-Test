@@ -218,6 +218,10 @@ export const deleteReview = mutation({
 
     const storeId = review.storeId; // Save storeId before deleting
 
+    if (review.imageIds && review.imageIds.length > 0) {
+      await Promise.all(review.imageIds.map((id) => ctx.storage.delete(id)));
+    }
+
     await ctx.db.delete(args.reviewId);
 
     // After deleting the review, recalculate the store's average rating

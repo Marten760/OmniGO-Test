@@ -183,6 +183,124 @@ export const approvePiPayment = action({
 });
 
 /**
+ * Internal action to refund funds from the app wallet to the customer's wallet.
+ */
+export const refundToCustomer = internalAction({
+  args: {
+    userId: v.id("users"),
+    storeId: v.id("stores"),
+    amount: v.number(),
+    orderId: v.id("orders"),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; reason?: string; txid?: string; }> => {
+    // 1. Start Payout Process (Idempotency Check) - We reuse the payout table for refunds
+    const startResult = await ctx.runMutation(internal.paymentsQueries.startPayout, {
+      storeId: args.storeId,
+      orderId: args.orderId,
+      amount: args.amount,
+    });
+
+    if (startResult.status === "already_completed") {
+      console.log(`[refundToCustomer] Refund for order ${args.orderId} already completed.`);
+      return { success: true, txid: startResult.txid };
+    }
+
+    if (startResult.status === "in_progress") {
+      console.warn(`[refundToCustomer] Refund for order ${args.orderId} is already in progress.`);
+      return { success: false, reason: "Refund is currently in progress. Please wait." };
+    }
+
+    const payoutId = startResult.payoutId!;
+
+    // 2. Get Customer Profile to find Pi UID
+    const profile = await ctx.runQuery(internal.users.getProfile, { userId: args.userId });
+    
+    if (!profile || !profile.walletAddress) {
+      const errorMsg = `Customer (ID: ${args.userId}) has no Wallet Address linked. Cannot refund automatically.`;
+      console.error(`[refundToCustomer] ${errorMsg}`);
+      await ctx.runMutation(internal.paymentsQueries.finalizePayout, {
+        payoutId,
+        status: "failed",
+        failureReason: errorMsg,
+      });
+      return { success: false, reason: errorMsg };
+    }
+
+    const recipientAddress = profile.walletAddress;
+
+    console.log(`[refundToCustomer] Processing refund of ${args.amount} Pi to Wallet: ${recipientAddress} (Order: ${args.orderId})`);
+
+    const apiKey = process.env.PI_API_KEY;
+    const walletPrivateSeed = process.env.PI_WALLET_PRIVATE_SEED;
+    
+    if (!apiKey || !walletPrivateSeed?.startsWith('S')) {
+      const errorMsg = "Missing or invalid Pi env vars.";
+      await ctx.runMutation(internal.paymentsQueries.finalizePayout, {
+        payoutId,
+        status: "failed",
+        failureReason: errorMsg,
+      });
+      return { success: false, reason: errorMsg };
+    }
+
+    const useSandbox = process.env.PI_SANDBOX === 'true';
+    const baseUrl = PI_PLATFORM_API_BASE;
+    const safeAmount = Math.round(args.amount * 1000000) / 1000000;
+
+    try {
+      // Generate a local reference ID for the memo (max 28 bytes for Stellar text memo)
+      const paymentId = `ref-${args.orderId.slice(-6)}-${Date.now().toString().slice(-5)}`;
+
+      // Step 4: Submit to Stellar
+      const myKeypair = StellarSdk.Keypair.fromSecret(walletPrivateSeed);
+      const networkUrl = getHorizonUrl();
+      const piNetwork = new StellarSdk.Horizon.Server(networkUrl);
+      const networkPassphrase = useSandbox ? 'Pi Testnet' : 'Pi Network';
+
+      const [myAccount, baseFee] = await Promise.all([
+        piNetwork.loadAccount(myKeypair.publicKey()),
+        piNetwork.fetchBaseFee(),
+      ]);
+
+      const transaction = new StellarSdk.TransactionBuilder(myAccount, {
+        fee: baseFee.toString(),
+        networkPassphrase,
+        timebounds: await piNetwork.fetchTimebounds(180),
+      })
+        .addOperation(StellarSdk.Operation.payment({
+          destination: recipientAddress,
+          asset: StellarSdk.Asset.native(),
+          amount: safeAmount.toString(),
+        }))
+        .addMemo(StellarSdk.Memo.text(paymentId))
+        .build();
+
+      transaction.sign(myKeypair);
+      const submitTxResponse = await piNetwork.submitTransaction(transaction);
+      const txid = submitTxResponse.hash;
+      console.log(`[refundToCustomer] Refund tx submitted: ${txid}`);
+
+      await ctx.runMutation(internal.paymentsQueries.finalizePayout, {
+        payoutId,
+        txid,
+        status: "completed"
+      });
+
+      return { success: true, txid };
+
+    } catch (error: any) {
+      console.error(`[refundToCustomer] Failed:`, error.message);
+      await ctx.runMutation(internal.paymentsQueries.finalizePayout, {
+        payoutId,
+        status: "failed",
+        failureReason: error.message,
+      });
+      return { success: false, reason: error.message };
+    }
+  },
+});
+
+/**
  * Completes the payment on the Pi Network from the server-side.
  */
 export const completePiPayment = action({
@@ -369,7 +487,6 @@ export const payoutToStore = internalAction({
 
     // Fetch latest wallet info from UserProfile to ensure we have the most up-to-date address
     let walletAddress = store.piWalletAddress;
-    let rawUid = store.piUid;
 
     try {
       // Resolve ownerId (tokenIdentifier) to User ID, then get Profile
@@ -377,16 +494,15 @@ export const payoutToStore = internalAction({
       const profile = await ctx.runQuery(internal.users.getProfile, { userId: user._id });
       if (profile) {
         if (profile.walletAddress) walletAddress = profile.walletAddress;
-        if (profile.piUid) rawUid = profile.piUid;
-        console.log(`[payoutToStore] Refreshed data from UserProfile. UID: ${rawUid}, Wallet: ${walletAddress ? 'Present' : 'Missing'}`);
+        console.log(`[payoutToStore] Refreshed data from UserProfile. Wallet: ${walletAddress ? 'Present' : 'Missing'}`);
       }
     } catch (err) {
       console.warn(`[payoutToStore] Could not fetch UserProfile for owner: ${err}. Using store data.`);
     }
 
-    // We rely solely on the Pi UID for A2U payouts. The Pi API resolves this to the correct wallet address.
-    if (!rawUid || typeof rawUid !== 'string' || rawUid.trim() === '') {
-      const error: Error = new Error(`No valid Pi UID found for store ${args.storeId}. Ensure the owner has linked their Pi account via 'Link Pi Wallet'.`);
+    // We rely solely on the Wallet Address for A2U payouts.
+    if (!walletAddress || typeof walletAddress !== 'string' || walletAddress.trim() === '') {
+      const error: Error = new Error(`No valid Wallet Address found for store ${args.storeId}. Ensure the owner has linked their Pi Wallet.`);
       console.error(`[payoutToStore] ${error.message}`);
       
       // Schedule a retry after 5 minutes to allow time for account linking.
@@ -399,15 +515,15 @@ export const payoutToStore = internalAction({
       await ctx.runMutation(internal.paymentsQueries.finalizePayout, {
         payoutId,
         status: "pending", // Mark as pending instead of failed
-        failureReason: "Awaiting Pi UID linkage. Retrying soon.",
+        failureReason: "Awaiting Wallet Linkage. Retrying soon.",
       });
       // Return a specific response indicating a retry will happen.
       return { success: false, reason: error.message, willRetry: true };
     }
     
-    const uid = rawUid.trim();
+    const recipientAddress = walletAddress.trim();
 
-    console.log(`[payoutToStore] Using Pi UID: ${uid.slice(0, 8)}... for store ${args.storeId}, order ${args.orderId}. (A2U Payout)`);
+    console.log(`[payoutToStore] Using Wallet: ${recipientAddress.slice(0, 8)}... for store ${args.storeId}, order ${args.orderId}. (Direct Payout)`);
 
     const apiKey = process.env.PI_API_KEY;
     const walletPrivateSeed = process.env.PI_WALLET_PRIVATE_SEED;
@@ -427,131 +543,12 @@ export const payoutToStore = internalAction({
     const baseUrl = PI_PLATFORM_API_BASE;
     console.log(`[payoutToStore] Using Base URL: ${baseUrl} (Sandbox: ${useSandbox})`);
 
-    // Step 0: Check for and handle any ongoing A2U payments for this UID.
-    try {
-      const ongoingResponse = await fetch(`${baseUrl}/v2/payments?uid=${uid}&direction=app_to_user`, {
-        headers: { Authorization: `Key ${apiKey}` },
-      });
-
-      if (ongoingResponse.ok) {
-        const ongoingPayments = await ongoingResponse.json();
-        const stuckPayment = ongoingPayments.find((p: any) => 
-          p.status.developer_approved && !p.status.developer_completed && !p.status.cancelled
-        );
-
-        if (stuckPayment) {
-          console.log(`[payoutToStore] Found ongoing A2U payment ${stuckPayment.identifier} for UID ${uid}. Attempting to cancel.`);
-          
-          // Attempt to cancel the stuck payment before proceeding.
-          const cancelRes = await fetch(`${baseUrl}/v2/payments/${stuckPayment.identifier}/cancel`, {
-            method: 'POST',
-            headers: { Authorization: `Key ${apiKey}` },
-          });
-
-          if (cancelRes.ok) {
-            console.log(`[payoutToStore] Successfully cancelled stuck payment ${stuckPayment.identifier}.`);
-          } else {
-            const cancelError = await cancelRes.text();
-            throw new Error(`Could not resolve ongoing payment ${stuckPayment.identifier}: ${cancelError}`);
-          }
-        }
-      }
-    } catch (error: any) {
-      // If we fail to handle the ongoing payment, we must abort to avoid the original error.
-      throw new Error(`Error while checking for ongoing payments: ${error.message}`);
-    }
-
     // Round to 6 decimal places to avoid floating point issues and satisfy Pi Network limits
     const safeAmount = Math.round(args.amount * 1000000) / 1000000;
-    const paymentData = {
-      amount: safeAmount,
-      memo: `Payout for order ${args.orderId.slice(-6)}`,
-      metadata: { orderId: args.orderId, storeId: args.storeId },
-      uid,
-    };
 
     try {
-      // Step 1: Create the A2U payment (with retry and cleanup for ongoing payments)
-      let paymentId: string | null = null;
-      let recipientAddress: string | null = null;
-      let retryCount = 0;
-      const maxRetries = 2;
-
-      while (retryCount < maxRetries) {
-        try {
-          const bodyToSend = {
-            amount: paymentData.amount,
-            memo: paymentData.memo,
-            metadata: paymentData.metadata,
-            uid: uid, // The UID from the store owner
-          };
-
-          console.log(`[payoutToStore] Sending create body (attempt ${retryCount + 1}):`, JSON.stringify(bodyToSend));
-
-          const createResponse = await fetch(`${baseUrl}/v2/payments`, {
-            method: 'POST',
-            headers: { 'Authorization': `Key ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(bodyToSend),
-          });
-
-          if (!createResponse.ok) {
-            const errorText = await createResponse.text();
-            console.error(`[payoutToStore] Full error response: ${errorText}`); // Log the full error
-            let errorObj;
-            try {
-              errorObj = JSON.parse(errorText); // Parse the error response
-            } catch (e) {
-              throw new Error(`Failed to create payout (unparsable error): ${errorText}`);
-            }
-
-            // Check for ongoing_payment_found
-            if (errorObj.error === 'ongoing_payment_found' && errorObj.payment && errorObj.payment.identifier) {
-              const ongoingPaymentId = errorObj.payment.identifier;
-              console.log(`[payoutToStore] Ongoing payment found: ${ongoingPaymentId}. Attempting to cancel...`);
-
-              const cancelResponse = await fetch(`${baseUrl}/v2/payments/${ongoingPaymentId}/cancel`, {
-                method: 'POST',
-                headers: { Authorization: `Key ${apiKey}` },
-              });
-
-              if (!cancelResponse.ok) throw new Error(`Failed to cancel ongoing payment ${ongoingPaymentId}: ${await cancelResponse.text()}`);
-              console.log(`[payoutToStore] Successfully cancelled ongoing payment ${ongoingPaymentId}. Retrying create...`);
-              retryCount++;
-              continue; // Retry create
-            } else if (errorObj.error === 'user_not_found') {
-              // Fallback for Sandbox: If API fails but we have a local wallet address, proceed manually.
-              if (useSandbox && walletAddress) {
-                console.warn(`[payoutToStore] User not found in Pi API, but Wallet Address ${walletAddress} exists in DB. Falling back to direct Testnet transfer.`);
-                paymentId = `manual-sandbox-${Date.now()}`;
-                recipientAddress = walletAddress;
-                break; // Exit the retry loop to proceed with Stellar transaction
-              }
-
-              // This specific error means the stored UID is invalid for the current environment.
-              // We throw a specific error message that the UI recognizes to show the "Link Pi Wallet" button.
-              console.error(`[payoutToStore] User not found error for UID: ${uid}.`);
-              throw new Error(`Pi User not found or no Wallet detected. Please ensure you have created a Pi Wallet in the Pi Browser (${useSandbox ? 'Testnet' : 'Mainnet'}) and linked it.`);
-            } else {
-              throw new Error(`Failed to create payout: ${errorText}`);
-            }
-          }
-
-          const createdPayment = await createResponse.json();
-          console.log(`[payoutToStore] Full createdPayment response:`, JSON.stringify(createdPayment, null, 2)); // For debugging
-
-          paymentId = createdPayment.identifier;
-          recipientAddress = createdPayment.to_address; // CORRECTED: Use to_address instead of recipient
-          console.log(`[payoutToStore] Created A2U payment ${paymentId} for order ${args.orderId}. Recipient: ${recipientAddress?.slice(0, 8)}...`);
-          break; // Success, exit loop
-        } catch (createError: any) {
-          if (retryCount >= maxRetries - 1) throw createError;
-          retryCount++;
-          console.warn(`[payoutToStore] Create attempt ${retryCount} failed: ${createError.message}. Retrying after cleanup...`);
-        }
-      }
-      if (!paymentId || !recipientAddress) {
-        throw new Error('No recipient address returned from create payment after retries.');
-      }
+      // Generate local ID for memo
+      const paymentId = `pay-${args.orderId.slice(-6)}-${Date.now().toString().slice(-5)}`;
 
       // Step 2: Build, Sign, and Submit Transaction using Stellar SDK
       if (!walletPrivateSeed?.startsWith('S')) {
@@ -586,7 +583,7 @@ export const payoutToStore = internalAction({
       const paymentOp = StellarSdk.Operation.payment({
         destination: recipientAddress,
         asset: StellarSdk.Asset.native(),
-        amount: paymentData.amount.toString(), // string for Stellar
+        amount: safeAmount.toString(), // string for Stellar
       });
 
       const timebounds = await piNetwork.fetchTimebounds(180); // 3 min
@@ -607,27 +604,6 @@ export const payoutToStore = internalAction({
       const submitTxResponse = await piNetwork.submitTransaction(transaction);
       const txid = submitTxResponse.hash;
       console.log(`[payoutToStore] Submitted tx ${txid} for payment ${paymentId}.`);
-
-      // Step 3: Complete the payment
-      // Only call /complete if it was a real Pi Platform payment (not a manual sandbox fallback)
-      if (!paymentId.startsWith('manual-sandbox-')) {
-        const completeResponse = await fetch(`${baseUrl}/v2/payments/${paymentId}/complete`, {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Key ${apiKey}`, 
-            'Content-Type': 'application/json' 
-          },
-          body: JSON.stringify({ txid }),
-        });
-
-        if (!completeResponse.ok) {
-          const errorText = await completeResponse.text();
-          throw new Error(`Failed to complete payout: ${errorText}`);
-        }
-        console.log(`[payoutToStore] Completed payment ${paymentId} with txid ${txid}.`);
-      } else {
-        console.log(`[payoutToStore] Skipping /complete API call for manual sandbox payment ${paymentId}.`);
-      }
 
       await ctx.runMutation(internal.paymentsQueries.finalizePayout, {
         payoutId,

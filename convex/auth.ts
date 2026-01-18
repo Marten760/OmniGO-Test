@@ -265,9 +265,10 @@ export const createOrUpdateUser = internalMutation({
         piUsername: piUsername,
       };
 
-      // Always update the wallet address with the latest value from Pi SDK,
-      // even if it's undefined. This ensures the DB reflects the current state.
-      profileUpdateData.walletAddress = walletAddress;
+      // Only update wallet address if a new one is provided.
+      if (walletAddress) {
+        profileUpdateData.walletAddress = walletAddress;
+      }
 
       if (profile) {
         await ctx.db.patch(profile._id, profileUpdateData);

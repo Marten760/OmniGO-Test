@@ -241,6 +241,9 @@ export const deleteProduct = mutation({
     if (product.imageId) {
       await ctx.storage.delete(product.imageId);
     }
+    if (product.imageIds) {
+      await Promise.all(product.imageIds.map((id) => ctx.storage.delete(id)));
+    }
     await ctx.db.delete(args.productId);
   },
 });

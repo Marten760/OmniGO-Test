@@ -102,16 +102,9 @@ export const processCompletedPayment = internalMutation({
         paymentStatus: "paid",
         txid: args.payment.txid,
       });
-      if (payment.metadata.storeId) {
-        const commissionRateString = process.env.APP_COMMISSION_RATE || '0.05';
-        const appCommissionRate = parseFloat(commissionRateString);
-        const payoutAmount = payment.amount * (1 - appCommissionRate);
-        await ctx.scheduler.runAfter(0, internal.paymentsActions.payoutToStore, {
-          storeId: payment.metadata.storeId,
-          amount: payoutAmount,
-          orderId: orderId,
-        });
-      }
+      // ESCROW IMPLEMENTATION:
+      // We do NOT trigger payoutToStore here anymore.
+      // The funds are now "Held" in the App Wallet until the order is marked as 'delivered'.
     }
   },
 });

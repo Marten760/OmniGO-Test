@@ -196,6 +196,10 @@ export const deletePromotion = mutation({
       throw new Error("You are not authorized to delete this promotion.");
     }
 
+    if (promotion.imageId) {
+      await ctx.storage.delete(promotion.imageId);
+    }
+
     await ctx.db.delete(args.promotionId);
     return { success: true };
   },

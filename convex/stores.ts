@@ -390,12 +390,13 @@ export const updateStoreWalletsOnProfileUpdate = internalMutation({
     if (stores.length > 0) {
       console.log(`[updateStoreWallets] Updating ${stores.length} stores with new UID: ${args.piUid}`);
       await Promise.all(
-        stores.map(store => 
-          ctx.db.patch(store._id, { 
-            piWalletAddress: args.walletAddress,
-            piUid: args.piUid, // Update the piUid as well
-          })
-        )
+        stores.map(store => {
+          const updatePayload: any = { piUid: args.piUid };
+          if (args.walletAddress) {
+            updatePayload.piWalletAddress = args.walletAddress;
+          }
+          return ctx.db.patch(store._id, updatePayload);
+        })
       );
       console.log(`Updated wallet and UID for ${stores.length} stores owned by user.`);
     }
@@ -419,11 +420,35 @@ export const deleteStore = mutation({
       throw new ConvexError("Not authorized to delete this store.");
     }
 
+    // Check for active orders before deletion
+    const activeOrder = await ctx.db
+      .query("orders")
+      .withIndex("by_store_creation_time", (q) => q.eq("storeId", args.storeId))
+      .filter((q) =>
+        q.and(
+          q.neq(q.field("status"), "delivered"),
+          q.neq(q.field("status"), "cancelled")
+        )
+      )
+      .first();
+
+    if (activeOrder) {
+      throw new ConvexError("Cannot delete store. There are active orders that must be completed first.");
+    }
+
+    // --- Delete associated storage files (Store Logo & Gallery) ---
+    if (store.logoImageId) await ctx.storage.delete(store.logoImageId);
+    if (store.galleryImageIds) await Promise.all(store.galleryImageIds.map((id) => ctx.storage.delete(id)));
+
     // --- Delete associated data ---
 
-    // Delete products
+    // Delete products and their images
     const products = await ctx.db.query("products").withIndex("by_store", q => q.eq("storeId", args.storeId)).collect();
-    await Promise.all(products.map(p => ctx.db.delete(p._id)));
+    await Promise.all(products.map(async (p) => {
+      if (p.imageId) await ctx.storage.delete(p.imageId);
+      if (p.imageIds) await Promise.all(p.imageIds.map((id) => ctx.storage.delete(id)));
+      await ctx.db.delete(p._id);
+    }));
 
     // Delete product categories
     const categories = await ctx.db.query("productCategories").withIndex("by_store", q => q.eq("storeId", args.storeId)).collect();
@@ -437,13 +462,35 @@ export const deleteStore = mutation({
     const orders = await ctx.db.query("orders").withIndex("by_store_creation_time", q => q.eq("storeId", args.storeId)).collect();
     await Promise.all(orders.map(o => ctx.db.delete(o._id)));
 
-    // Delete reviews
+    // Delete reviews and their images
     const reviews = await ctx.db.query("reviews").withIndex("by_store", q => q.eq("storeId", args.storeId)).collect();
-    await Promise.all(reviews.map(r => ctx.db.delete(r._id)));
+    await Promise.all(reviews.map(async (r) => {
+      if (r.imageIds) await Promise.all(r.imageIds.map((id) => ctx.storage.delete(id)));
+      await ctx.db.delete(r._id);
+    }));
 
     // Delete follows for this store
     const follows = await ctx.db.query("follows").withIndex("by_store", q => q.eq("storeId", args.storeId)).collect();
     await Promise.all(follows.map(f => ctx.db.delete(f._id)));
+
+    // Delete promotions and their images
+    const promotions = await ctx.db.query("promotions").withIndex("by_store", q => q.eq("storeId", args.storeId)).collect();
+    await Promise.all(promotions.map(async (p) => {
+      if (p.imageId) await ctx.storage.delete(p.imageId);
+      await ctx.db.delete(p._id);
+    }));
+
+    // Delete store drivers links
+    const drivers = await ctx.db.query("storeDrivers").withIndex("by_store", q => q.eq("storeId", args.storeId)).collect();
+    await Promise.all(drivers.map(d => ctx.db.delete(d._id)));
+
+    // Delete payouts
+    const payouts = await ctx.db.query("payouts").withIndex("by_store", q => q.eq("storeId", args.storeId)).collect();
+    await Promise.all(payouts.map(p => ctx.db.delete(p._id)));
+
+    // Delete campaigns
+    const campaigns = await ctx.db.query("campaigns").withIndex("by_storeId", q => q.eq("storeId", args.storeId)).collect();
+    await Promise.all(campaigns.map(c => ctx.db.delete(c._id)));
 
     // Finally, delete the store itself
     await ctx.db.delete(args.storeId);
