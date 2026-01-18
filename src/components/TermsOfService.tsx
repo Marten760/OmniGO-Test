@@ -47,7 +47,7 @@ export const TermsOfService = ({ onBack }: { onBack?: () => void }) => {
 
       <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6 sm:p-8">
         <h1 className="text-3xl font-bold text-white mb-2">Terms of Service</h1>
-        <p className="text-sm text-gray-400 italic mb-6">Last updated: September 16, 2025</p>
+        <p className="text-sm text-gray-400 italic mb-6">Last updated: January 18, 2026</p>
 
         <div className="toc bg-gray-900/50 p-4 rounded-xl mb-6 border border-gray-700">
           <h2 className="toc-title !border-0 !m-0 !p-0 !text-xl">Table of Contents</h2>
@@ -96,10 +96,12 @@ export const TermsOfService = ({ onBack }: { onBack?: () => void }) => {
 
           <h2 id="payments">4. Payments and Transactions</h2>
           <p>All payments for orders are processed through the Pi Network. By placing an order, you authorize the transaction through the Pi SDK. OmniGo does not store your private wallet keys or secret phrases. We only record transaction details (ID, amount, status) for order fulfillment and support. In addition to the product price, you may be subject to:</p>
+          <p><strong>Escrow System:</strong> To protect both parties, funds are held in escrow by the platform. Payouts to stores are released only after the order is marked as delivered and the dispute window has closed without active issues.</p>
+          <p><strong>Payouts & Refunds:</strong> To receive payouts (for store owners) or refunds (for customers), you must provide a valid Pi Network Public Wallet Address. We are not responsible for funds lost due to incorrect wallet addresses provided by you.</p>
           <ul>
             <li><strong>Delivery Fee:</strong> Determined independently by the stores and displayed upon request.</li>
             <li><strong>Taxes:</strong> You are responsible for any applicable taxes associated with your transactions.</li>
-            <li><strong>Refunds:</strong> Subject to each store's refund policy. We assist in facilitation, but the final decision rests with the store.</li>
+            <li><strong>Refunds & Disputes:</strong> You may report issues with an order within 48 hours of delivery. Refunds are subject to review of the claim and evidence. While OmniGo facilitates this process, final resolution may depend on the store's policy and the validity of the report.</li>
           </ul>
 
           <h2 id="user-conduct">5. User Conduct</h2>
@@ -120,7 +122,8 @@ export const TermsOfService = ({ onBack }: { onBack?: () => void }) => {
             <li><strong>Legal Compliance:</strong> You are responsible for complying with all local laws and regulations related to your business, including sales licenses, food safety (if a restaurant), health regulations, and consumer protection laws.</li>
             <li><strong>Listing Accuracy:</strong> Provide accurate and substantive descriptions of products, including prices and images that reflect the actual product. Any misrepresentation may result in the cancellation of your store.</li>
             <li><strong>Order Fulfillment:</strong> You are legally obligated to complete any order accepted through our platform, unless there is a clear error in pricing or product description.</li>
-            <li><strong>Customer Service and Refunds:</strong> You are primarily responsible for your customer service and for processing their complaints and refund requests. You must have a clear refund policy.</li>
+            <li><strong>Customer Service and Refunds:</strong> You are primarily responsible for resolving customer complaints. You agree to participate in the platform's dispute resolution process and accept that refunds may be processed from escrowed funds if a dispute is resolved in the customer's favor.</li>
+            <li><strong>Escrow & Payouts:</strong> You acknowledge that funds from your sales are held in escrow by OmniGo and are released to your provided wallet address only after the order is confirmed delivered and the dispute period (48 hours) has expired without active claims. You agree to the automatic deduction of the platform commission from each payout.</li>
             <li><strong>Taxes:</strong> You are solely responsible for calculating and remitting any taxes related to your sales.</li>
           </ul>
 

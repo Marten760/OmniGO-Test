@@ -43,7 +43,7 @@ export const PrivacyPolicy = ({ onBack }: { onBack: () => void }) => {
 
       <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6 sm:p-8">
         <h1 className="text-3xl font-bold text-white mb-2">Privacy Policy</h1>
-        <p className="text-sm text-gray-400 italic mb-6">Last updated: September 15, 2025</p>
+        <p className="text-sm text-gray-400 italic mb-6">Last updated: January 18, 2026</p>
 
         <div className="toc bg-gray-900/50 p-4 rounded-xl mb-6 border border-gray-700">
           <h2 className="toc-title !border-0 !m-0 !p-0 !text-xl">Table of Contents</h2>
@@ -73,10 +73,11 @@ export const PrivacyPolicy = ({ onBack }: { onBack: () => void }) => {
           <h3>1.1 Information You Provide Directly:</h3>
           <ul>
             <li><strong>Account Information:</strong> When logging in via Pi Browser <span className="pi-badge">Pi Network</span>, we collect your user ID and username from the Pi Network to create and manage your account.</li>
-            <li><strong>Profile Information:</strong> The name you choose, email address, phone number, and delivery addresses you save.</li>
-            <li><strong>Store Information (For Store Owners):</strong> If you are a store owner, we collect store information you provide (store name, description, address, working hours, contact information, delivery fees) and product information (images, names, prices, descriptions, inventory status).</li>
+            <li><strong>Profile Information:</strong> The name you choose, email address, phone number, delivery addresses, and Public Wallet Address you save.</li>
+            <li><strong>Store Information (For Store Owners):</strong> If you are a store owner, we collect store information you provide (store name, description, address, working hours, contact information) and product information (images, names, prices, descriptions, inventory status).</li>
             <li><strong>Order Content:</strong> Products you order, quantities, special instructions, delivery address, and any discount codes you use.</li>
             <li><strong>Content You Create:</strong> Ratings and reviews you leave on stores and products.</li>
+            <li><strong>Dispute Evidence:</strong> Information and photos you submit when reporting an issue with an order.</li>
             <li><strong>Support Communications:</strong> Any information you provide when contacting customer support.</li>
           </ul>
           {/* No change, but keeping for context */}
@@ -89,7 +90,7 @@ export const PrivacyPolicy = ({ onBack }: { onBack: () => void }) => {
 
           <h3>1.3 Payment Information:</h3> {/* No change, but keeping for context */}
           <ul>
-            <li><strong>Pi Transactions:</strong> To facilitate transactions, we process payment information through the Pi Network. <strong>We confirm that we do not collect, store, or process any sensitive wallet information (such as Secret Seed/Phrase).</strong> All payment authentication and approval processes are securely handled through the Pi SDK. We only store the transaction ID, amount, and status to track orders and resolve any disputes.</li>
+            <li><strong>Pi Transactions:</strong> To facilitate transactions, we process payment information through the Pi Network. <strong>We confirm that we do not collect, store, or process any sensitive wallet information (such as Secret Seed/Phrase).</strong> We store your <strong>Public Wallet Address</strong> to facilitate refunds and payouts. All payment authentication and approval processes are securely handled through the Pi SDK. We also store transaction IDs, amounts, and status to track orders and resolve disputes.</li>
           </ul>
 
           <h2 id="how-we-use">2. How We Use Your Information</h2>
@@ -114,7 +115,7 @@ export const PrivacyPolicy = ({ onBack }: { onBack: () => void }) => {
           <h2 id="sharing-info">4. Sharing Your Information</h2>
           <p>We may share your information with the following parties:</p>
           <ul>
-            <li><strong>Store Owners:</strong> We share your order details (delivery address, products, instructions) with the store owner to complete and prepare your order.</li>
+            <li><strong>Store Owners:</strong> We share your order details (delivery address, products, instructions) with the store owner to complete and prepare your order. In the event of a dispute, we also share your submitted report and evidence with the store owner to facilitate resolution.</li>
             <li><strong>Delivery Service Providers:</strong> If the store uses an external delivery service, we may share contact and address information with them to deliver your order.</li>
             <li><strong>Service Providers ("Third-Party Processors"):</strong> Other companies that provide services to us, such as data hosting, analytics, payment processing (Pi Network), and customer support. These providers only have access to your data to perform these tasks on our behalf and are obligated not to disclose or use it for any other purpose.</li>
             <li><strong>Business Transfers:</strong> In the event of a merger, acquisition, or asset sale, your data may be transferred. We will notify you before your data becomes subject to a different privacy policy.</li>
@@ -139,10 +140,9 @@ export const PrivacyPolicy = ({ onBack }: { onBack: () => void }) => {
             <li><strong>Restriction of Processing:</strong> The right to request restriction of how we use your data.</li>
             <li><strong>Data Portability:</strong> The right to receive your data in a structured, machine-readable format.</li>
           </ul> {/* No change, but keeping for context */}
-          <p>To exercise any of these rights, please contact us at: <strong>OmniGo.privacy@gmail.com</strong>. We will respond to your request within one month.</p>
 
           <h2 id="children-privacy">9. Children's Privacy</h2>
-          <p>Our Service is not intended for users under the age of 13 ("Children"), and we do not knowingly collect any personal information from Children. If you are a parent or guardian and believe your child has provided us with personal information, please contact us, and we will delete this information from our records.</p>
+          <p>Our Service is not intended for users under the age of 18 ("Children"), and we do not knowingly collect any personal information from Children. If you are a parent or guardian and believe your child has provided us with personal information, please contact us, and we will delete this information from our records.</p>
 
           <h2 id="policy-changes">10. Changes to This Privacy Policy</h2>
           <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date at the top. We advise you to review this policy periodically for any changes.</p>

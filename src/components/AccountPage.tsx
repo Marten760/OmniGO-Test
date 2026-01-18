@@ -54,14 +54,15 @@ type AccountPageProps = {
   setSelectedStore: (storeId: Id<"stores">) => void;
   setSelectedProduct: (product: Doc<"products"> & { storeName: string; storeId: Id<"stores">; imageUrls: (string | null)[]; }) => void;
   onLogout: () => void;
+  initialSubView?: 'main' | 'profile' | 'addresses' | 'paymentMethods' | 'notifications' | 'favorites' | 'reviews' | 'help' | 'settings';
 };
 
-export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProduct, onLogout }: AccountPageProps) {
+export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProduct, onLogout, initialSubView = 'main' }: AccountPageProps) {
   const { sessionToken, user } = useAuth();
   const orderStats = useQuery(api.orders.getUserOrderStats, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
   const avgRating = useQuery(api.reviews.getUserAverageRating, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
   const hasStore = useQuery(api.stores.checkUserHasStore, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
-  const [activeSubView, setActiveSubView] = useState<'main' | 'profile' | 'addresses' | 'paymentMethods' | 'notifications' | 'favorites' | 'reviews' | 'help' | 'settings'>('main');
+  const [activeSubView, setActiveSubView] = useState<'main' | 'profile' | 'addresses' | 'paymentMethods' | 'notifications' | 'favorites' | 'reviews' | 'help' | 'settings'>(initialSubView);
   const setActiveRole = useMutation(api.auth.setActiveRole);
   const [isTogglingRole, setIsTogglingRole] = useState(false);
   const updateUserProfile = useMutation(api.auth.updateUserProfile);
@@ -253,15 +254,15 @@ export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProdu
             </div>
           )}
           {/* Stats */}
-          <div className="pb-6">
-            <div className={`grid ${hasStore ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
-              <Card>
-                <CardContent className="p-2 sm:p-4 text-center space-y-1 flex flex-col items-center justify-center h-full">
-                  <div className="text-xl sm:text-2xl font-bold text-purple-400">{orderStats?.totalOrders ?? 0}</div>
-                  <div className="text-xs text-gray-400">Orders</div>
-                </CardContent>
-              </Card>
-              {hasStore && (
+          {hasStore && (
+            <div className="pb-6">
+              <div className="grid grid-cols-3 gap-3">
+                <Card>
+                  <CardContent className="p-2 sm:p-4 text-center space-y-1 flex flex-col items-center justify-center h-full">
+                    <div className="text-xl sm:text-2xl font-bold text-purple-400">{orderStats?.totalOrders ?? 0}</div>
+                    <div className="text-xs text-gray-400">Orders</div>
+                  </CardContent>
+                </Card>
                 <Card>
                   <CardContent className="p-2 sm:p-4 text-center space-y-1 flex flex-col items-center justify-center h-full">
                     {avgRating === undefined ? <Loader2 className="h-6 w-6 animate-spin" /> : (
@@ -272,15 +273,15 @@ export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProdu
                     )}
                   </CardContent>
                 </Card>
-              )}
-              <Card>
-                <CardContent className="p-2 sm:p-4 text-center space-y-1 flex flex-col items-center justify-center h-full">
-                  <div className="text-lg sm:text-xl font-bold text-purple-400">π{orderStats?.totalSpent.toFixed(2) ?? '0'}</div>
-                  <div className="text-xs text-gray-400">Total Spent</div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardContent className="p-2 sm:p-4 text-center space-y-1 flex flex-col items-center justify-center h-full">
+                    <div className="text-lg sm:text-xl font-bold text-purple-400">π{orderStats?.totalSpent.toFixed(2) ?? '0'}</div>
+                    <div className="text-xs text-gray-400">Total Spent</div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Menu Items */}
           <div className="space-y-2">

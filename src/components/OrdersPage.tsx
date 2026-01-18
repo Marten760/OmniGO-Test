@@ -1,13 +1,16 @@
-import { useQuery } from "convex/react";
+import { useQuery, useMutation} from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useCart, type CartItem } from "../context/CartContext";
 import { Cart } from "./Cart";
 import { AddReview } from "./AddReview";
 import { formatPiPrice } from "../lib/utils";
-import { Clock, MapPin, Star, Package, Loader2, Check, X } from "lucide-react";
+import { Clock, MapPin, Star, Package, Loader2, Check, X, AlertTriangle, Upload, ShieldAlert, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
-import { Doc } from "../../convex/_generated/dataModel";
+import { Doc, Id } from "../../convex/_generated/dataModel";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
+import { Button } from "./ui/button";
+import { ChatScreen } from "./chat/ChatScreen";
 
 function OrderCardSkeleton() {
   return (
@@ -51,6 +54,13 @@ export function OrdersPage() {
   const sessionToken = useMemo(() => localStorage.getItem("sessionToken"), []);
   const [reviewingOrder, setReviewingOrder] = useState<Doc<"orders"> | null>(null);
   const orders = useQuery(api.orders.getOrdersByUser, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
+  
+  const [reportingOrder, setReportingOrder] = useState<Doc<"orders"> | null>(null);
+  const confirmReceiptMutation = useMutation(api.orders.confirmOrderReceipt);
+  const createDisputeMutation = useMutation(api.orders.createDispute);
+  const generateUploadUrl = useMutation(api.stores.generateUploadUrl);
+  const [activeChatId, setActiveChatId] = useState<Id<"conversations"> | null>(null);
+  const getOrCreateConversation = useMutation(api.reports.getOrCreateReportConversation);
 
   // Fetch all user reviews once to avoid N+1 queries inside the map.
   const userReviews = useQuery(api.reviews.getUserReviews, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
@@ -63,7 +73,7 @@ export function OrdersPage() {
   );
   
   const orderHistory = orders?.filter(order => 
-    order.status === "delivered" || order.status === "cancelled"
+    order.status === "delivered" || order.status === "cancelled" || order.status === "disputed"
   );
 
   // Close review modal if cart is opened
@@ -79,6 +89,7 @@ export function OrdersPage() {
       case "out_for_delivery": return "bg-blue-500";
       case "delivered": return "bg-green-500";
       case "cancelled": return "bg-red-500";
+      case "disputed": return "bg-orange-500";
       default: return "bg-gray-500";
     }
   };
@@ -90,6 +101,7 @@ export function OrdersPage() {
       case "out_for_delivery": return "Out for Delivery";
       case "delivered": return "Delivered";
       case "cancelled": return "Cancelled";
+      case "disputed": return "Disputed";
       default: return status;
     }
   };
@@ -102,6 +114,10 @@ export function OrdersPage() {
       minute: '2-digit'
     });
   };
+
+  if (activeChatId) {
+    return <ChatScreen conversationId={activeChatId} onBack={() => setActiveChatId(null)} />;
+  }
 
   if (orders === undefined) {
     return (
@@ -177,6 +193,30 @@ export function OrdersPage() {
     setIsCartOpen(true);
   };
 
+  const handleConfirmReceipt = async (orderId: Id<"orders">) => {
+    if (!sessionToken) return;
+    try {
+      await confirmReceiptMutation({ tokenIdentifier: sessionToken, orderId });
+      toast.success("Receipt confirmed! Funds released to merchant.");
+    } catch (error) {
+      toast.error("Failed to confirm receipt.");
+    }
+  };
+
+  const handleReportIssue = (order: Doc<"orders">) => {
+    setReportingOrder(order);
+  };
+
+  const handleChat = async (orderId: Id<"orders">) => {
+    if (!sessionToken) return;
+    try {
+      const conversationId = await getOrCreateConversation({ tokenIdentifier: sessionToken, orderId });
+      setActiveChatId(conversationId);
+    } catch (error) {
+      toast.error("Failed to open chat.");
+    }
+  };
+
   const OrderCard = ({ order }: { order: Doc<"orders"> }) => {
     const hasReviewed = reviewedStoreIds.has(order.storeId);
 
@@ -233,7 +273,7 @@ export function OrdersPage() {
         <OrderStatusTracker status={order.status} />
 
         <div className="flex items-center justify-between pt-4 border-t border-gray-700 mt-4">
-          {order.status === 'delivered' || order.status === 'cancelled' ? (
+          {order.status === 'delivered' || order.status === 'cancelled' || order.status === 'disputed' ? (
             <div className="flex items-center space-x-4">
               {order.status === 'delivered' && !hasReviewed && (
                 <button onClick={() => setReviewingOrder(order)} className="flex items-center space-x-2 text-purple-400 hover:text-purple-300 transition-colors">
@@ -247,6 +287,30 @@ export function OrdersPage() {
               >
                 Reorder
               </button>
+              {order.status === 'delivered' && (
+                <>
+                  <button 
+                    onClick={() => handleConfirmReceipt(order._id)}
+                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                  >
+                    <Check size={14} /> Confirm Receipt
+                  </button>
+                  <button 
+                    onClick={() => handleReportIssue(order)}
+                    className="text-red-400 hover:text-red-300 text-sm font-medium transition-colors flex items-center gap-1"
+                  >
+                    <AlertTriangle size={14} /> Report Issue
+                  </button>
+                </>
+              )}
+              {order.status === 'disputed' && (
+                <button 
+                  onClick={() => handleChat(order._id)}
+                  className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors flex items-center gap-1"
+                >
+                  <MessageSquare size={14} /> Chat with Store
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex items-center space-x-4 text-gray-400 text-sm">
@@ -368,6 +432,110 @@ export function OrdersPage() {
           </div>
         </div>
       )}
+
+      {/* Report Issue Dialog */}
+      <Dialog open={!!reportingOrder} onOpenChange={(open) => !open && setReportingOrder(null)}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <ShieldAlert className="h-6 w-6" />
+              Report an Issue
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Please provide details about the issue. This will hold the payment until resolved.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {reportingOrder && (
+            <ReportForm 
+              orderId={reportingOrder._id} 
+              onClose={() => setReportingOrder(null)} 
+              sessionToken={sessionToken}
+              createDispute={createDisputeMutation}
+              generateUploadUrl={generateUploadUrl}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function ReportForm({ orderId, onClose, sessionToken, createDispute, generateUploadUrl }: any) {
+  const [reason, setReason] = useState("Damaged Item");
+  const [description, setDescription] = useState("");
+  const [images, setImages] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sessionToken) return;
+    if (description.length < 10) {
+      toast.error("Please provide a detailed description (min 10 chars).");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Upload images
+      const imageIds = await Promise.all(images.map(async (file) => {
+        const url = await generateUploadUrl();
+        const result = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        const { storageId } = await result.json();
+        return storageId;
+      }));
+
+      await createDispute({
+        tokenIdentifier: sessionToken,
+        orderId,
+        reason,
+        description,
+        imageIds: imageIds.length > 0 ? imageIds : undefined,
+      });
+
+      toast.success("Report submitted. Support will review shortly.");
+      onClose();
+    } catch (error) {
+      toast.error("Failed to submit report.");
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 py-2">
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-300">Reason</label>
+        <select value={reason} onChange={(e) => setReason(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white">
+          <option>Damaged Item</option>
+          <option>Missing Item</option>
+          <option>Wrong Item</option>
+          <option>Never Received</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-300">Description</label>
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white min-h-[100px]" placeholder="Describe the issue..." required />
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-300">Evidence (Images)</label>
+        <div className="flex items-center gap-2">
+          <input type="file" accept="image/*" multiple onChange={(e) => setImages(Array.from(e.target.files || []))} className="hidden" id="report-images" />
+          <label htmlFor="report-images" className="cursor-pointer flex items-center gap-2 bg-gray-800 border border-gray-700 px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+            <Upload size={16} /> <span>{images.length > 0 ? `${images.length} images selected` : "Upload Images"}</span>
+          </label>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button type="submit" disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-white">{isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : "Submit Report"}</Button>
+      </DialogFooter>
+    </form>
   );
 }

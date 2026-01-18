@@ -310,6 +310,7 @@ export function ChatScreen({ conversationId, onBack }: ChatScreenProps) {
               onMouseLeave={() => clearTimeout(longPressTimerRef.current!)}
               onTouchStart={(e) => { longPressTimerRef.current = setTimeout(() => { e.preventDefault(); handlePress(); }, 500); }}
               onTouchEnd={() => clearTimeout(longPressTimerRef.current!)}
+              onTouchMove={() => clearTimeout(longPressTimerRef.current!)}
             >
               <motion.div
                 drag={!selectionMode ? "x" : false}

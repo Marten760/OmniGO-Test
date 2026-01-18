@@ -27,6 +27,7 @@ import { InventoryTabContent } from './InventoryTabContent';
 import { MarketingTabContent } from './MarketingTabContent';
 import { PayoutsTabContent } from './PayoutsTabContent'; 
 import { StatCard } from './StatCard';
+import { ReportsTabContent } from './ReportsTabContent';
 
 import { useAuth } from '../../hooks/useAuth';
 import { usePi } from '../../hooks/usePi';
@@ -43,6 +44,7 @@ interface StoreManagerProps {
 const TABS = [
     { id: 'analytics', label: 'Analytics', icon: LayoutDashboard },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
+    { id: 'reports', label: 'Disputes', icon: AlertTriangle },
     { id: 'products', label: 'Products', icon: Package },
     { id: 'inventory', label: 'Inventory', icon: Package },
     { id: 'marketing', label: 'Marketing', icon: Package },
@@ -107,6 +109,8 @@ export function StoreManager({ store, onBack, onLogout, navigate, onNavigateToCh
         return <StoreAnalyticsDashboard store={store} timeRange={timeRange} setTimeRange={setTimeRange} detailedAnalytics={detailedAnalytics} />;
       case 'orders':
         return <OrdersTabContent storeId={store._id} onNavigateToChat={onNavigateToChat} />;
+      case 'reports':
+        return <ReportsTabContent storeId={store._id} onNavigateToChat={onNavigateToChat} />;
       case 'products':
         return <Products storeId={store._id} />;
       case 'inventory':
@@ -161,8 +165,11 @@ export function StoreManager({ store, onBack, onLogout, navigate, onNavigateToCh
                           await deleteStore({ storeId: store._id, tokenIdentifier: sessionToken });
                           toast.success("Store deleted successfully.");
                           onBack();
-                        } catch (error) {
-                          toast.error("Failed to delete store.");
+                        } catch (error: any) {
+                          const errorMessage = error.data || error.message || "Failed to delete store.";
+                          toast.error("Unable to delete store", {
+                            description: errorMessage,
+                          });
                         }
                       }}
                       className="bg-red-600 hover:bg-red-700 text-white"
