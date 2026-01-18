@@ -98,6 +98,11 @@ export function AppContent({
          return { status: 'missing_location' };
      }
 
+     // 1.5 Check if user has wallet address set
+     if (!user.profile.walletAddress) {
+         return { status: 'missing_wallet' };
+     }
+
      // 2. If inside a store, check delivery
      if (selectedStore && storeData) {
          if (storeData.hasDelivery) {
@@ -285,6 +290,14 @@ export function AppContent({
           onLogout={onLogout}
           initialSubView="addresses"
         />;
+      case "account_profile":
+        return <AccountPage 
+          setCurrentView={setCurrentView} 
+          setSelectedStore={setSelectedStore}
+          setSelectedProduct={setSelectedProduct}
+          onLogout={onLogout}
+          initialSubView="profile"
+        />;
       case "privacy":
         return <PrivacyPolicy onBack={() => setCurrentView("account")} />;
       case "terms":
@@ -357,27 +370,31 @@ export function AppContent({
       )}
 
       {/* Delivery/Location Warnings - Fixed at bottom to prevent interaction with cart/checkout buttons */}
-      {sessionToken && deliveryStatus.status !== 'ok' && deliveryStatus.status !== 'loading' && currentView !== 'account_addresses' && (
+      {sessionToken && deliveryStatus.status !== 'ok' && deliveryStatus.status !== 'loading' && 
+       !(deliveryStatus.status === 'missing_location' && currentView === 'account_addresses') &&
+       !(deliveryStatus.status === 'missing_wallet' && currentView === 'account_profile') && (
         <div className="fixed bottom-[80px] sm:bottom-0 left-0 right-0 z-50 p-4 bg-red-600/95 backdrop-blur-md text-white border-t border-red-500 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom-10">
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
                 <div className="flex-1">
                     <h4 className="font-bold text-lg flex items-center justify-center sm:justify-start gap-2">
                         <AlertTriangle className="w-6 h-6 text-yellow-300" />
                         {deliveryStatus.status === 'missing_location' && "Action Required: Set Location"}
+                        {deliveryStatus.status === 'missing_wallet' && "Action Required: Link Wallet"}
                         {deliveryStatus.status === 'invalid_country' && "Out of Delivery Country"}
                         {deliveryStatus.status === 'invalid_region' && "Out of Delivery Zone"}
                     </h4>
                     <p className="text-sm text-red-100 mt-1">
                         {deliveryStatus.status === 'missing_location' && "Please update your profile with your Country and City to place orders."}
+                        {deliveryStatus.status === 'missing_wallet' && "Please link your Pi Wallet address to ensure you can receive refunds."}
                         {/* @ts-ignore */}
                         {deliveryStatus.status === 'invalid_country' && `This store only delivers within ${deliveryStatus.storeCountry}.`}
                         {/* @ts-ignore */}
                         {deliveryStatus.status === 'invalid_region' && `This store does not deliver to ${deliveryStatus.city}.`}
                     </p>
                 </div>
-                {deliveryStatus.status === 'missing_location' && (
-                    <Button onClick={() => setCurrentView('account_addresses')} variant="secondary" size="sm" className="whitespace-nowrap bg-white text-red-600 hover:bg-gray-100 font-bold shadow-lg">
-                        Update Profile Now
+                {(deliveryStatus.status === 'missing_location' || deliveryStatus.status === 'missing_wallet') && (
+                    <Button onClick={() => setCurrentView(deliveryStatus.status === 'missing_location' ? 'account_addresses' : 'account_profile')} variant="secondary" size="sm" className="whitespace-nowrap bg-white text-red-600 hover:bg-gray-100 font-bold shadow-lg">
+                        {deliveryStatus.status === 'missing_location' ? "Update Profile Now" : "Link Wallet Now"}
                     </Button>
                 )}
             </div>
