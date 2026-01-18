@@ -43,6 +43,7 @@ export function AppContent({
 
   const [selectedCountry, setSelectedCountry] = useState<string>("United States");
   const [selectedRegion, setSelectedRegion] = useState<string>("New York");
+  const [locationInitialized, setLocationInitialized] = useState(false);
   const [selectedStore, setSelectedStore] = useState<Id<"stores"> | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<(Doc<"products"> & { storeName: string; storeId: Id<"stores">; imageUrls: (string | null)[]; }) | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -70,6 +71,20 @@ export function AppContent({
   api.auth.getUserFromToken, 
   sessionToken ? { tokenIdentifier: sessionToken } : "skip"
   );
+
+  // Automatically set location from user profile on load
+  useEffect(() => {
+    if (user?.profile?.country && user?.profile?.city && !locationInitialized) {
+      setSelectedCountry(user.profile.country);
+      setSelectedRegion(user.profile.city);
+      setLocationInitialized(true);
+    }
+  }, [user, locationInitialized]);
+
+  // Reset location initialization when session changes
+  useEffect(() => {
+    setLocationInitialized(false);
+  }, [sessionToken]);
 
   // NEW: Fetch store data to validate delivery when a store is selected
   const storeData = useQuery(api.stores.getStoreById, selectedStore ? { storeId: selectedStore } : "skip");
@@ -262,6 +277,14 @@ export function AppContent({
           setSelectedProduct={setSelectedProduct}
           onLogout={onLogout} 
         />;
+      case "account_addresses":
+        return <AccountPage 
+          setCurrentView={setCurrentView} 
+          setSelectedStore={setSelectedStore}
+          setSelectedProduct={setSelectedProduct}
+          onLogout={onLogout}
+          initialSubView="addresses"
+        />;
       case "privacy":
         return <PrivacyPolicy onBack={() => setCurrentView("account")} />;
       case "terms":
@@ -334,7 +357,7 @@ export function AppContent({
       )}
 
       {/* Delivery/Location Warnings - Fixed at bottom to prevent interaction with cart/checkout buttons */}
-      {sessionToken && deliveryStatus.status !== 'ok' && deliveryStatus.status !== 'loading' && (
+      {sessionToken && deliveryStatus.status !== 'ok' && deliveryStatus.status !== 'loading' && currentView !== 'account_addresses' && (
         <div className="fixed bottom-[80px] sm:bottom-0 left-0 right-0 z-50 p-4 bg-red-600/95 backdrop-blur-md text-white border-t border-red-500 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom-10">
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
                 <div className="flex-1">
@@ -353,7 +376,7 @@ export function AppContent({
                     </p>
                 </div>
                 {deliveryStatus.status === 'missing_location' && (
-                    <Button onClick={() => setCurrentView('account')} variant="secondary" size="sm" className="whitespace-nowrap bg-white text-red-600 hover:bg-gray-100 font-bold shadow-lg">
+                    <Button onClick={() => setCurrentView('account_addresses')} variant="secondary" size="sm" className="whitespace-nowrap bg-white text-red-600 hover:bg-gray-100 font-bold shadow-lg">
                         Update Profile Now
                     </Button>
                 )}
