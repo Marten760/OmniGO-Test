@@ -16,7 +16,7 @@ import { TermsOfService } from "./components/TermsOfService";
 import { BottomNavigation } from "./components/BottomNavigation";
 import { NotificationBell } from "./components/NotificationBell";
 import { UserNav } from "./components/dashboard/UserNav";
-import { ProductItemDetailModal } from "./components/ProductItemDetailModal";
+import { HomeProductDetailModal } from "./components/HomeProductDetailModal";
 import { HomePage } from "./components/HomePage";
 import { useCart } from "./context/CartContext";
 import { ChatsList } from "./components/chat/ChatsList";
@@ -298,6 +298,15 @@ export function AppContent({
           onLogout={onLogout}
           initialSubView="profile"
         />;
+      case "account_promotions":
+        return <AccountPage 
+          setCurrentView={setCurrentView} 
+          setSelectedStore={setSelectedStore}
+          setSelectedProduct={setSelectedProduct}
+          onLogout={onLogout}
+          initialSubView="notifications"
+          initialNotificationTab="promotions"
+        />;
       case "privacy":
         return <PrivacyPolicy onBack={() => setCurrentView("account")} />;
       case "terms":
@@ -464,7 +473,7 @@ export function AppContent({
       )}
 
       {selectedProduct && (
-        <ProductItemDetailModal
+        <HomeProductDetailModal
           isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
           item={selectedProduct!}
