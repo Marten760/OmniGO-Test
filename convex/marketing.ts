@@ -95,15 +95,13 @@ export const sendEmailCampaign = action({
 
     // Call the query from the 'follows' module to avoid circular dependency
     const followers: Doc<"users">[] = await ctx.runQuery(api.follows.getFollowers, { storeId: args.storeId });
-    const followerEmails: string[] = followers
-      .map((f: Doc<"users">) => f.email)
-      .filter((e): e is string => !!e);
 
-    if (followerEmails.length === 0) {
-      throw new ConvexError("This store has no followers with emails to send a campaign to.");
+    // Check if there are followers at all, rather than just emails
+    if (followers.length === 0) {
+      throw new ConvexError("This store has no followers yet.");
     }
 
-    // NOTE: This is a mock implementation. In a real-world scenario, you would
+    // NOTE: Even if followerEmails is empty, we proceed to send in-app notifications.
     // use an email service provider like Resend, SendGrid, or Mailgun here.
     // For now, we will create an in-app notification for each follower.
     await Promise.all(
@@ -117,7 +115,7 @@ export const sendEmailCampaign = action({
       )
     );
 
-    return { success: true, sentCount: followerEmails.length };
+    return { success: true, sentCount: followers.length };
   },
 });
 
@@ -166,8 +164,12 @@ export const applyDiscountToOrder = internalMutation({
 
     // 4. تحقق new customers only
     if (discount.targetUsers === 'new_users_only') {
-      const firstOrder = await ctx.db.query("orders").withIndex("by_user", (q) => q.eq("userId", args.userId)).first();
-      if (firstOrder) throw new ConvexError("This discount is for new customers only.");
+      const userOrders = await ctx.db.query("orders").withIndex("by_user", (q) => q.eq("userId", args.userId)).collect();
+      // Exclude the current order if it has already been created (which is passed in args.orderId)
+      const previousOrders = args.orderId 
+        ? userOrders.filter(o => o._id !== args.orderId)
+        : userOrders;
+      if (previousOrders.length > 0) throw new ConvexError("This discount is for new customers only.");
     }
 
     // 5. احسب الخصم
@@ -206,8 +208,7 @@ export const validateDiscountCode = query({
     code: v.string(),
     storeId: v.id("stores"),
     orderTotal: v.number(),
-    // We don't need userId for validation if we are not checking per-user limits before application
-    // If we need to check new-user status, we'd need the user.
+    tokenIdentifier: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     if (args.code.trim() === "") {
@@ -241,8 +242,28 @@ export const validateDiscountCode = query({
       return { isValid: false, message: "This discount has reached its total usage limit." };
     }
 
-    // Note: Per-user and new-user checks are best done in the final `validateAndApplyDiscount` mutation
-    // as they require the user's identity. This query provides a preliminary validation.
+    // User-specific checks
+    if (args.tokenIdentifier) {
+      const user = await validateToken(ctx, args.tokenIdentifier).catch(() => null);
+      if (user) {
+        // Check per-user usage limit
+        if (discount.usageLimitPerUser && discount.usageLimitPerUser > 0) {
+          const userUsages = await ctx.db.query("discountUsages")
+            .withIndex("by_discount_and_user", q => q.eq("discountId", discount._id).eq("userId", user._id))
+            .collect();
+          if (userUsages.length >= discount.usageLimitPerUser) {
+            return { isValid: false, message: "You have already used this discount code the maximum number of times." };
+          }
+        }
+        // Check new customers only
+        if (discount.targetUsers === 'new_users_only') {
+          const existingOrder = await ctx.db.query("orders").withIndex("by_user", q => q.eq("userId", user._id)).first();
+          if (existingOrder) {
+            return { isValid: false, message: "This discount is for new customers only." };
+          }
+        }
+      }
+    }
 
     let discountAmount = 0;
     if (discount.type === 'percentage') {
