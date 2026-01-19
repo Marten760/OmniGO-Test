@@ -403,7 +403,10 @@ export const confirmOrderReceipt = mutation({
 
     // We could add a 'completed' status here if desired, but 'delivered' + payout implies completion.
     // For now, we just ensure the payout happens now.
-    await ctx.db.patch(args.orderId, { scheduledPayoutId: undefined }); // Clear the job ID
+    await ctx.db.patch(args.orderId, { 
+      scheduledPayoutId: undefined,
+      paymentStatus: "released"
+    }); // Clear the job ID and update payment status
 
     return { success: true };
   },
