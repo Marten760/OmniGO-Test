@@ -55,6 +55,7 @@ export function OrdersPage() {
   const [reviewingOrder, setReviewingOrder] = useState<Doc<"orders"> | null>(null);
   const orders = useQuery(api.orders.getOrdersByUser, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
   
+  const [processingOrders, setProcessingOrders] = useState<Set<string>>(new Set());
   const [reportingOrder, setReportingOrder] = useState<Doc<"orders"> | null>(null);
   const confirmReceiptMutation = useMutation(api.orders.confirmOrderReceipt);
   const createDisputeMutation = useMutation(api.orders.createDispute);
@@ -195,10 +196,16 @@ export function OrdersPage() {
 
   const handleConfirmReceipt = async (orderId: Id<"orders">) => {
     if (!sessionToken) return;
+    setProcessingOrders(prev => new Set(prev).add(orderId));
     try {
       await confirmReceiptMutation({ tokenIdentifier: sessionToken, orderId });
       toast.success("Receipt confirmed! Funds released to merchant.");
     } catch (error) {
+      setProcessingOrders(prev => {
+        const next = new Set(prev);
+        next.delete(orderId);
+        return next;
+      });
       toast.error("Failed to confirm receipt.");
     }
   };
@@ -275,7 +282,7 @@ export function OrdersPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-4 border-t border-gray-700 mt-4 gap-4">
           {order.status === 'delivered' || order.status === 'cancelled' || order.status === 'disputed' ? (
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-              {order.status === 'delivered' && (
+              {order.status === 'delivered' && order.paymentStatus !== 'released' && !processingOrders.has(order._id) && (
                 <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
                   <button 
                     onClick={() => handleConfirmReceipt(order._id)}
@@ -457,6 +464,12 @@ export function OrdersPage() {
               sessionToken={sessionToken}
               createDispute={createDisputeMutation}
               generateUploadUrl={generateUploadUrl}
+              onSubmitStart={() => setProcessingOrders(prev => new Set(prev).add(reportingOrder._id))}
+              onSubmitError={() => setProcessingOrders(prev => {
+                const next = new Set(prev);
+                next.delete(reportingOrder._id);
+                return next;
+              })}
             />
           )}
         </DialogContent>
@@ -465,7 +478,7 @@ export function OrdersPage() {
   );
 }
 
-function ReportForm({ orderId, onClose, sessionToken, createDispute, generateUploadUrl }: any) {
+function ReportForm({ orderId, onClose, sessionToken, createDispute, generateUploadUrl, onSubmitStart, onSubmitError }: any) {
   const [reason, setReason] = useState("Damaged Item");
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<File[]>([]);
@@ -480,6 +493,7 @@ function ReportForm({ orderId, onClose, sessionToken, createDispute, generateUpl
     }
 
     setIsSubmitting(true);
+    if (onSubmitStart) onSubmitStart();
     try {
       // Upload images
       const imageIds = await Promise.all(images.map(async (file) => {
@@ -505,6 +519,7 @@ function ReportForm({ orderId, onClose, sessionToken, createDispute, generateUpl
       onClose();
     } catch (error) {
       toast.error("Failed to submit report.");
+      if (onSubmitError) onSubmitError();
       console.error(error);
     } finally {
       setIsSubmitting(false);
