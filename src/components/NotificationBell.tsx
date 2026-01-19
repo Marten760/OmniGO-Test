@@ -57,6 +57,8 @@ export function NotificationBell({ setCurrentView }: NotificationBellProps) {
       // Navigate to the appropriate view
       if (notification.type === 'new_order' || notification.type === 'status_update') {
         setCurrentView('dashboard');
+      } else if (notification.type === 'promotion') {
+        setCurrentView('account_promotions');
       } else {
         setCurrentView('account');
         // You might want a sub-view for notifications in the account page later

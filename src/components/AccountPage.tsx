@@ -55,9 +55,10 @@ type AccountPageProps = {
   setSelectedProduct: (product: Doc<"products"> & { storeName: string; storeId: Id<"stores">; imageUrls: (string | null)[]; }) => void;
   onLogout: () => void;
   initialSubView?: 'main' | 'profile' | 'addresses' | 'paymentMethods' | 'notifications' | 'favorites' | 'reviews' | 'help' | 'settings';
+  initialNotificationTab?: "orders" | "promotions";
 };
 
-export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProduct, onLogout, initialSubView = 'main' }: AccountPageProps) {
+export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProduct, onLogout, initialSubView = 'main', initialNotificationTab = "orders" }: AccountPageProps) {
   const { sessionToken, user } = useAuth();
   const orderStats = useQuery(api.orders.getUserOrderStats, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
   const avgRating = useQuery(api.reviews.getUserAverageRating, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
@@ -179,7 +180,7 @@ export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProdu
   }
 
   if (activeSubView === 'notifications') {
-    return <NotificationsView onBack={() => setActiveSubView('main')} />
+    return <NotificationsView onBack={() => setActiveSubView('main')} defaultTab={initialNotificationTab} />
   }
 
   if (activeSubView === 'favorites') {

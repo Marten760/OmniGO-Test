@@ -272,43 +272,47 @@ export function OrdersPage() {
         )}
         <OrderStatusTracker status={order.status} />
 
-        <div className="flex items-center justify-between pt-4 border-t border-gray-700 mt-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-4 border-t border-gray-700 mt-4 gap-4">
           {order.status === 'delivered' || order.status === 'cancelled' || order.status === 'disputed' ? (
-            <div className="flex items-center space-x-4">
-              {order.status === 'delivered' && !hasReviewed && (
-                <button onClick={() => setReviewingOrder(order)} className="flex items-center space-x-2 text-purple-400 hover:text-purple-300 transition-colors">
-                  <Star size={16} />
-                  <span className="text-sm">Rate Order</span>
-                </button>
-              )}
-              <button 
-                onClick={() => handleReorder(order)}
-                className="text-gray-400 hover:text-white transition-colors text-sm"
-              >
-                Reorder
-              </button>
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               {order.status === 'delivered' && (
-                <>
+                <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
                   <button 
                     onClick={() => handleConfirmReceipt(order._id)}
-                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                    className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 active:scale-95"
                   >
-                    <Check size={14} /> Confirm Receipt
+                    <Check size={18} /> Confirm Receipt
                   </button>
                   <button 
                     onClick={() => handleReportIssue(order)}
-                    className="text-red-400 hover:text-red-300 text-sm font-medium transition-colors flex items-center gap-1"
+                    className="flex-1 sm:flex-none bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 px-3 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 active:scale-95 whitespace-nowrap"
                   >
-                    <AlertTriangle size={14} /> Report Issue
+                    <AlertTriangle size={18} /> Report Issue
                   </button>
-                </>
+                </div>
               )}
+              
+              <div className="flex items-center gap-3 order-2 sm:order-1 w-full sm:w-auto justify-between sm:justify-start">
+                {order.status === 'delivered' && !hasReviewed && (
+                  <button onClick={() => setReviewingOrder(order)} className="flex items-center gap-1 text-purple-400 hover:text-purple-300 transition-colors bg-purple-500/10 px-3 py-1.5 rounded-lg text-sm font-medium">
+                    <Star size={14} />
+                    <span>Rate</span>
+                  </button>
+                )}
+                <button 
+                  onClick={() => handleReorder(order)}
+                  className="text-gray-400 hover:text-white transition-colors text-sm px-2"
+                >
+                  Reorder
+                </button>
+              </div>
+
               {order.status === 'disputed' && (
                 <button 
                   onClick={() => handleChat(order._id)}
-                  className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors flex items-center gap-1"
+                  className="w-full sm:w-auto bg-blue-500/10 text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 order-3"
                 >
-                  <MessageSquare size={14} /> Chat with Store
+                  <MessageSquare size={16} /> Chat with Store
                 </button>
               )}
             </div>
@@ -320,7 +324,7 @@ export function OrdersPage() {
               </div>
             </div>
           )}
-          <div className="text-lg sm:text-xl font-bold text-white font-mono">
+          <div className="text-lg sm:text-xl font-bold text-white font-mono self-end sm:self-auto">
             {formatPiPrice(order.totalAmount)}
           </div>
         </div>

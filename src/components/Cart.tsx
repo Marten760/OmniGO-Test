@@ -76,7 +76,12 @@ export function Cart({
 
   const validationResult = useQuery(
     api.marketing.validateDiscountCode,
-    submittedCode && storeId ? { storeId: storeId as Id<"stores">, code: submittedCode, orderTotal: subtotal } : 'skip'
+    submittedCode && storeId ? { 
+      storeId: storeId as Id<"stores">, 
+      code: submittedCode, 
+      orderTotal: subtotal,
+      tokenIdentifier: sessionToken ?? undefined 
+    } : 'skip'
   );
 
   const addAddress = useMutation(api.addresses.addAddress);

@@ -75,7 +75,7 @@ function NotificationSettings({ onBack }: { onBack: () => void }) {
     );
 }
 
-export function NotificationsView({ onBack }: { onBack: () => void }) {
+export function NotificationsView({ onBack, defaultTab = "orders" }: { onBack: () => void, defaultTab?: "orders" | "promotions" }) {
     const sessionToken = useMemo(() => localStorage.getItem("sessionToken"), []);
     const notifications = useQuery(api.notifications.getNotifications, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
     const markAllAsRead = useMutation(api.notifications.markAllAsRead);
@@ -119,7 +119,7 @@ export function NotificationsView({ onBack }: { onBack: () => void }) {
                 </div>
             </div>
 
-            <Tabs defaultValue="orders" className="space-y-6">
+            <Tabs defaultValue={defaultTab} className="space-y-6">
                 <TabsList className="grid w-full grid-cols-2 bg-gray-800/70 rounded-xl p-1 h-auto">
                     <TabsTrigger value="orders" className="rounded-lg text-gray-300 font-semibold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg">Orders</TabsTrigger>
                     <TabsTrigger value="promotions" className="rounded-lg text-gray-300 font-semibold transition-all data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-lg">Promotions</TabsTrigger>

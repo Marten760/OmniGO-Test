@@ -38,7 +38,7 @@ export function ProductCarouselCard({ product, onProductSelect, onStoreSelect }:
   return (
     <div
       className="relative w-36 sm:w-44 flex-shrink-0 rounded-2xl overflow-hidden shadow-lg bg-gray-800 border border-gray-700 cursor-pointer group transition-all duration-300 hover:scale-105 hover:shadow-xl"
-      onClick={() => onStoreSelect(product.storeId)}
+      onClick={() => onProductSelect(product)}
     >
       {/* Product Image */}
       <div className="w-full h-28 sm:h-32 overflow-hidden rounded-t-2xl">
