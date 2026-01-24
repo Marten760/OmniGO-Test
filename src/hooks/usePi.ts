@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 declare global {
   interface Window {
     Pi: any;
+    piSdkInitialized?: boolean;
   }
 }
 
@@ -38,62 +39,48 @@ export const usePi = () => {
 
   const loadPiSdk = useCallback(() => {
     return new Promise<void>((resolve, reject) => {
-      // Check if Pi SDK script is already added to avoid duplicates
-      if (document.getElementById('pi-sdk-script') && window.Pi) {
-        console.log('[Pi SDK] Script already loaded, checking init...');  // Log إضافي
-        if (!isInitialized) {
-          try {
-            const isSandbox = process.env.NODE_ENV === 'development' || import.meta.env.VITE_PI_SANDBOX === 'true';  // غيرت إلى 'true' للتوافق مع Sandbox
-            const config: { version: string, sandbox?: boolean } = { version: "2.0" };
-            if (isSandbox) {
-              config.sandbox = true;  // فقط في Sandbox
-            }
-            console.log('[Pi SDK] Initializing with config:', config);  // Log إضافي للتشخيص
-            window.Pi.init(config);
-            setIsInitialized(true);
-          } catch (error) {
-            console.error('Pi SDK re-initialization error:', error);  // Log موجود
-          }
-        }
+      // Ensure Pi.init() is called only once in the app's lifecycle.
+      if (window.piSdkInitialized) {
+        if (!isInitialized) setIsInitialized(true); // Sync local state if it gets out of sync
         resolve();
         return;
       }
 
-      console.log('[Pi SDK] Loading script...');  // Log إضافي
+      // If script tag exists but our flag is not set, it's a weird state.
+      // We'll just proceed with loading a new script to be safe.
+      const existingScript = document.getElementById('pi-sdk-script');
+      if (existingScript) {
+        existingScript.remove();
+      }
+
       const script = document.createElement('script');
       script.id = 'pi-sdk-script';
       script.src = 'https://sdk.minepi.com/pi-sdk.js';
       script.async = true;
       script.onload = () => {
-        console.log('[Pi SDK] Script loaded successfully');  // Log إضافي
         if (window.Pi) {
-          console.log('[Pi SDK] window.Pi is available');  // Log إضافي
           try {
-            const isSandbox = process.env.NODE_ENV === 'development' || import.meta.env.VITE_PI_SANDBOX === 'true';  // غيرت إلى 'true'
+            const isSandbox = process.env.NODE_ENV === 'development' || import.meta.env.VITE_PI_SANDBOX === 'true';
             const config: { version: string, sandbox?: boolean } = { version: "2.0" };
-            if (isSandbox) {
-              config.sandbox = true;  // فقط في Sandbox، في Mainnet يكون فارغاً
-            }
-            console.log('[Pi SDK] Initializing with config:', JSON.stringify(config));  // Log إضافي
+            if (isSandbox) config.sandbox = true;
             window.Pi.init(config);
+            window.piSdkInitialized = true; // Set global flag
             setIsInitialized(true);
             resolve();
           } catch (error) {
-            console.error('Pi SDK initialization error:', error);  // Log محسن
+            console.error('Pi SDK initialization error:', error);
             reject(new Error('Failed to initialize Pi SDK'));
           }
         } else {
-          console.error('[Pi SDK] FATAL: window.Pi is not available after script load.');  // Log إضافي
-          reject(new Error('Pi SDK failed to load'));
+          reject(new Error('Pi SDK failed to load: window.Pi not found.'));
         }
       };
       script.onerror = () => {
-        console.error('[Pi SDK] Failed to load script');  // Log محسن
         reject(new Error('Failed to load Pi SDK script'));
       };
       document.body.appendChild(script);
     });
-  }, [isInitialized]);
+  }, [isInitialized]); // Keep dependency to sync state correctly if hook re-mounts.
 
   const onIncompletePaymentFound = useCallback(async (payment: any) => { // `payment` is the incomplete payment object from Pi SDK
     console.log('[usePi] Incomplete payment found:', payment.identifier);

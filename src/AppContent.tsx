@@ -178,15 +178,6 @@ export function AppContent({
   }, [sessionToken, updatePresence]);
 
   const seedDatabase = useMutation(api.seedData.seedDatabase);
-  const storesForSeedCheck = useQuery(api.stores.getStores, {
-    country: "United States",
-    region: "New York",
-    categories: [], // Add missing categories argument
-    priceRange: [], // Add missing priceRange argument
-    storeType: "", // Add missing storeType argument
-    hasDelivery: undefined,
-    sortBy: "",
-  });
 
   const handleSeedDatabase = async () => {
     if (!sessionToken) {
@@ -262,7 +253,7 @@ export function AppContent({
           setSelectedProduct={setSelectedProduct}
         />;
       case "orders":
-        return <OrdersPage />;
+        return <OrdersPage onNavigateToChat={handleNavigateToChat} />;
       case "delivery": // Add a new case for the delivery view
         return <DeliveryDashboard onNavigateToChat={handleNavigateToChat} navigate={navigate} />;
       case "dashboard":
