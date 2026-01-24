@@ -1,7 +1,8 @@
 import { mutation, query, action, internalMutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
-import { api } from "./_generated/api";
+import { paginationOptsValidator } from "convex/server";
+import { api, internal } from "./_generated/api";
 import { validateToken } from "./util";
 
 export const createDiscount = mutation({
@@ -74,6 +75,50 @@ export const createDiscount = mutation({
   },
 });
 
+// Internal mutation to process campaign sending in batches (Background Job)
+export const sendCampaignBatch = internalMutation({
+  args: {
+    storeId: v.id("stores"),
+    subject: v.string(),
+    content: v.string(),
+    cursor: v.optional(v.string()), // For pagination
+    processedCount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const BATCH_SIZE = 50; // Process 50 followers at a time to prevent timeout
+
+    // Fetch a batch of followers directly from the follows table
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("follows")
+      .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
+      .paginate({ cursor: args.cursor ?? null, numItems: BATCH_SIZE });
+
+    if (page.length > 0) {
+      // Create notifications for this batch
+      await Promise.all(page.map(follow => 
+        ctx.db.insert("notifications", {
+          userId: follow.userId,
+          storeId: args.storeId,
+          message: `${args.subject}: ${args.content}`,
+          type: "promotion",
+          isRead: false,
+        })
+      ));
+    }
+
+    // If there are more followers, schedule the next batch recursively
+    if (!isDone) {
+      await ctx.scheduler.runAfter(0, internal.marketing.sendCampaignBatch, {
+        storeId: args.storeId,
+        subject: args.subject,
+        content: args.content,
+        cursor: continueCursor,
+        processedCount: args.processedCount + page.length,
+      });
+    }
+  },
+});
+
 export const sendEmailCampaign = action({
   args: {
     tokenIdentifier: v.string(),
@@ -93,29 +138,16 @@ export const sendEmailCampaign = action({
       throw new ConvexError("You are not authorized to send campaigns for this store.");
     }
 
-    // Call the query from the 'follows' module to avoid circular dependency
-    const followers: Doc<"users">[] = await ctx.runQuery(api.follows.getFollowers, { storeId: args.storeId });
+    // OPTIMIZATION: Instead of fetching all followers at once, start a background job.
+    // This prevents timeouts when a store has thousands of followers.
+    await ctx.runMutation(internal.marketing.sendCampaignBatch, {
+      storeId: args.storeId,
+      subject: args.subject,
+      content: args.content,
+      processedCount: 0,
+    });
 
-    // Check if there are followers at all, rather than just emails
-    if (followers.length === 0) {
-      throw new ConvexError("This store has no followers yet.");
-    }
-
-    // NOTE: Even if followerEmails is empty, we proceed to send in-app notifications.
-    // use an email service provider like Resend, SendGrid, or Mailgun here.
-    // For now, we will create an in-app notification for each follower.
-    await Promise.all(
-      followers.map(follower => 
-        ctx.runMutation(api.notifications.create, {
-          userId: follower._id,
-          storeId: args.storeId,
-          message: `${args.subject}: ${args.content}`,
-          type: "promotion",
-        })
-      )
-    );
-
-    return { success: true, sentCount: followers.length };
+    return { success: true, sentCount: 0 }; // Returns 0 immediately as processing is in background
   },
 });
 
@@ -125,12 +157,13 @@ export const applyDiscountToOrder = internalMutation({
     userId: v.id("users"),
     orderTotal: v.number(),
     storeId: v.id("stores"),
-    tokenIdentifier: v.optional(v.string()),
+    tokenIdentifier: v.optional(v.string()), // Kept for compatibility but not strictly enforced for internal calls
     orderId: v.optional(v.id("orders")),  // إذا كان order موجود
   },
   handler: async (ctx, args) => {
-    const user = await validateToken(ctx, args.tokenIdentifier!);
-    if (user._id !== args.userId) throw new ConvexError("Unauthorized");
+    // Since this is an internal mutation, we trust the caller (orders.ts) and verify the user directly via ID.
+    const user = await ctx.db.get(args.userId);
+    if (!user) throw new ConvexError("User not found");
 
     // 1. احصل على discount
     const discount = await ctx.db
@@ -164,7 +197,9 @@ export const applyDiscountToOrder = internalMutation({
 
     // 4. تحقق new customers only
     if (discount.targetUsers === 'new_users_only') {
-      const userOrders = await ctx.db.query("orders").withIndex("by_user", (q) => q.eq("userId", args.userId)).collect();
+      // OPTIMIZATION: Only fetch up to 2 orders to check existence, not all history.
+      const userOrders = await ctx.db.query("orders").withIndex("by_user", (q) => q.eq("userId", args.userId)).take(2);
+      
       // Exclude the current order if it has already been created (which is passed in args.orderId)
       const previousOrders = args.orderId 
         ? userOrders.filter(o => o._id !== args.orderId)
@@ -257,7 +292,7 @@ export const validateDiscountCode = query({
         }
         // Check new customers only
         if (discount.targetUsers === 'new_users_only') {
-          const existingOrder = await ctx.db.query("orders").withIndex("by_user", q => q.eq("userId", user._id)).first();
+          const existingOrder = await ctx.db.query("orders").withIndex("by_user", q => q.eq("userId", user._id)).first(); // OPTIMIZATION: Use .first()
           if (existingOrder) {
             return { isValid: false, message: "This discount is for new customers only." };
           }
@@ -283,20 +318,21 @@ export const getDiscountsByStore = query({
   args: {
     tokenIdentifier: v.optional(v.string()),
     storeId: v.id("stores"),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    if (!args.tokenIdentifier) return [];
+    if (!args.tokenIdentifier) return { page: [], isDone: true, continueCursor: "" };
     const user = await validateToken(ctx, args.tokenIdentifier).catch(() => null);
     const store = await ctx.db.get(args.storeId);
     if (!user || !store || store.ownerId !== user.tokenIdentifier) {
-      return [];
+      return { page: [], isDone: true, continueCursor: "" };
     }
 
     const discounts = await ctx.db
       .query("discounts")
       .withIndex("by_storeId", (q) => q.eq("storeId", args.storeId))
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
 
     return discounts;
   },

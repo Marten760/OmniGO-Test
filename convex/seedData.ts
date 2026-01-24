@@ -24,11 +24,21 @@ export const seedDatabase = mutation({
       "reviews",
       "orders",
       "follows",
+      "storeFavorites",
       "productFavorites",
       "notifications",
       "discounts",
+      "discountUsages",
       "campaigns",
       "piPayments",
+      "cartItems",
+      "storeDrivers",
+      "promotions",
+      "reports",
+      "payouts",
+      "conversations",
+      "messages",
+      "userConversations",
     ];
 
     // Clear all tables

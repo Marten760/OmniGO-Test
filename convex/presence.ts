@@ -17,7 +17,10 @@ export const update = mutation({
       .unique();
 
     if (existingPresence) {
-      await ctx.db.patch(existingPresence._id, { lastSeen: Date.now() });
+      // Optimization: Only update if more than 30 seconds have passed to save DB writes
+      if (Date.now() - existingPresence.lastSeen > 30000) {
+        await ctx.db.patch(existingPresence._id, { lastSeen: Date.now() });
+      }
     } else {
       await ctx.db.insert("presence", {
         userId: user._id,

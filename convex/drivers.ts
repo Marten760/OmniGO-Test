@@ -60,8 +60,10 @@ export const getDriversForStore = query({
 
     const driversWithProfiles = await Promise.all(
       driverLinks.map(async (link) => {
-        const driverProfile = await ctx.db.query("userProfiles").withIndex("by_user", q => q.eq("userId", link.driverId)).unique();
-        const driverUser = await ctx.db.get(link.driverId);
+        const [driverProfile, driverUser] = await Promise.all([
+          ctx.db.query("userProfiles").withIndex("by_user", q => q.eq("userId", link.driverId)).unique(),
+          ctx.db.get(link.driverId)
+        ]);
         const profileImageUrl = driverProfile?.profileImageId 
           ? await ctx.storage.getUrl(driverProfile.profileImageId) 
           : null;

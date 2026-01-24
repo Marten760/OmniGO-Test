@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { Doc } from "./_generated/dataModel";
 import { validateToken } from "./util";
 
@@ -41,6 +42,16 @@ export const toggleFollow = mutation({
       await ctx.db.delete(existingFollow._id);
       return { isFollowing: false };
     } else {
+      // Security: Limit max follows per user to prevent abuse
+      const currentFollowsCount = (await ctx.db
+        .query("follows")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .take(100)).length;
+
+      if (currentFollowsCount >= 100) {
+        throw new ConvexError("You have reached the maximum limit of 100 followed stores.");
+      }
+
       await ctx.db.insert("follows", {
         userId: user._id,
         storeId: args.storeId,
@@ -52,36 +63,40 @@ export const toggleFollow = mutation({
 
 // Query to get all stores a user is following
 export const getFollowedStores = query({
-  args: { tokenIdentifier: v.string() },
+  args: { 
+    tokenIdentifier: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
-    const follows = await ctx.db.query("follows").withIndex("by_user", q => q.eq("userId", user._id)).collect();
+    const result = await ctx.db.query("follows").withIndex("by_user", q => q.eq("userId", user._id)).paginate(args.paginationOpts);
     
-    const stores = await Promise.all(
-      follows.map(async (follow) => await ctx.db.get(follow.storeId))
-    );
-
-    return stores.filter(Boolean); // Filter out any nulls if a store was deleted
+    return {
+      ...result,
+      page: (await Promise.all(
+        result.page.map(async (follow) => await ctx.db.get(follow.storeId))
+      )).filter((s): s is Doc<"stores"> => s !== null)
+    };
   },
 });
 
 export const getFollowers = query({
-  args: { storeId: v.id("stores") },
-  handler: async (ctx, args): Promise<Doc<"users">[]> => {
-    const follows = await ctx.db
+  args: { 
+    storeId: v.id("stores"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
       .query("follows")
       .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
-      .collect();
+      .paginate(args.paginationOpts);
 
-    const userIds = follows.map((f) => f.userId);
-    if (userIds.length === 0) return [];
-
-    const users = await ctx.db
-      .query("users")
-      .filter((q) => q.or(...userIds.map((id) => q.eq(q.field("_id"), id))))
-      .collect();
-
-    return users;
+    return {
+      ...result,
+      page: (await Promise.all(
+        result.page.map(async (follow) => await ctx.db.get(follow.userId))
+      )).filter((u): u is Doc<"users"> => u !== null)
+    };
   },
 });
 

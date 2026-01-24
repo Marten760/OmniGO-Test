@@ -48,6 +48,10 @@ export const findOrCreateConversation = mutation({
       },
     });
 
+    // Add entries to userConversations for efficient querying
+    await ctx.db.insert("userConversations", { userId: user._id, conversationId, updatedAt: Date.now(), isArchived: false });
+    await ctx.db.insert("userConversations", { userId: storeOwner._id, conversationId, updatedAt: Date.now(), isArchived: false });
+
     return conversationId;
   },
 });
@@ -72,8 +76,9 @@ export const findOrCreateConversationForOrder = mutation({
     const store = await ctx.db.get(order.storeId);
     const isOwner = store?.ownerId === initiator.tokenIdentifier;
     const isAssignedDriver = order.driverId === initiator._id;
+    const isCustomer = order.userId === initiator._id;
 
-    if (!isOwner && !isAssignedDriver) {
+    if (!isOwner && !isAssignedDriver && !isCustomer) {
       throw new ConvexError("You are not authorized to start a chat for this order.");
     }
 
@@ -85,7 +90,7 @@ export const findOrCreateConversationForOrder = mutation({
     }
 
     // Create a new conversation linked to the order
-    return await ctx.db.insert("conversations", {
+    const conversationId = await ctx.db.insert("conversations", {
       participants: [initiator._id, customerId].sort(),
       orderId: args.orderId,
       updatedAt: Date.now(),
@@ -94,6 +99,11 @@ export const findOrCreateConversationForOrder = mutation({
         [customerId.toString()]: 0,
       },
     });
+
+    await ctx.db.insert("userConversations", { userId: initiator._id, conversationId, updatedAt: Date.now(), isArchived: false });
+    await ctx.db.insert("userConversations", { userId: customerId, conversationId, updatedAt: Date.now(), isArchived: false });
+
+    return conversationId;
   },
 });
 
@@ -128,11 +138,16 @@ export const findOrCreateDirectConversation = mutation({
       return existingConversation._id;
     }
 
-    return await ctx.db.insert("conversations", {
+    const conversationId = await ctx.db.insert("conversations", {
       participants,
       updatedAt: Date.now(),
       unreadCounts: { [user._id.toString()]: 0, [otherUser._id.toString()]: 0 },
     });
+
+    await ctx.db.insert("userConversations", { userId: user._id, conversationId, updatedAt: Date.now(), isArchived: false });
+    await ctx.db.insert("userConversations", { userId: otherUser._id, conversationId, updatedAt: Date.now(), isArchived: false });
+
+    return conversationId;
   },
 });
 
@@ -142,40 +157,38 @@ export const getConversations = query({
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
 
-    // إصلاح: جلب جميع المحادثات عبر index عام، ثم filter في JS (كفء لعدد صغير)
-    const allConversations = await ctx.db
-      .query("conversations")
-      .withIndex("by_updatedAt") // استخدم index للترتيب حسب updatedAt
-      .order("desc") // ترتيب desc حسب updatedAt (بدون field name)
-      .filter(q => q.eq(q.field("isArchived"), undefined)) // Filter out archived conversations
-      .collect();
+    // OPTIMIZED: Fetch only the user's conversations using the new table
+    const userConvs = await ctx.db
+      .query("userConversations")
+      .withIndex("by_user_archived_updated", (q) => q.eq("userId", user._id).eq("isArchived", false))
+      .order("desc")
+      .take(50); // Pagination limit
 
     const blockedUserIds = new Set(user.blockedUsers ?? []);
 
-    const conversations = allConversations.filter((conv: Doc<"conversations">) =>
-      conv.participants.includes(user._id) &&
-      !conv.participants.some(p => p !== user._id && blockedUserIds.has(p))
-    );
+    // Deduplicate conversation IDs to prevent duplicate entries in the list
+    const uniqueConversationIds = [...new Set(userConvs.map(uc => uc.conversationId))];
 
-    const conversationsWithDetails = [];
-    for (const conv of conversations) {
+    // Fetch the actual conversation documents
+    const conversations = (await Promise.all(uniqueConversationIds.map(id => ctx.db.get(id)))).filter((c): c is Doc<"conversations"> => c !== null);
+
+    const conversationsWithDetails = await Promise.all(conversations.map(async (conv) => {
       const otherUserId = conv.participants.find((id) => id !== user._id) ?? user._id;
 
-      if (!otherUserId) {
-        continue; // Skip this iteration if otherUserId is somehow invalid
-      }
+      if (!otherUserId) return null;
 
-      const otherUser = await ctx.db.get(otherUserId);
-      const otherUserProfile = await ctx.db
-        .query("userProfiles")
-        .withIndex("by_user", (q) => q.eq("userId", otherUserId))
-        .unique();
+      // Fetch all related data in parallel for better performance
+      const [otherUser, otherUserProfile, report] = await Promise.all([
+        ctx.db.get(otherUserId),
+        ctx.db.query("userProfiles").withIndex("by_user", (q) => q.eq("userId", otherUserId)).unique(),
+        conv.orderId ? ctx.db.query("reports").withIndex("by_order", q => q.eq("orderId", conv.orderId!)).first() : null
+      ]);
       
       const profileImageUrl = otherUserProfile?.profileImageId
         ? await ctx.storage.getUrl(otherUserProfile.profileImageId)
         : null;
 
-      conversationsWithDetails.push({
+      return {
         ...conv,
         otherUserName: [otherUserProfile?.firstName, otherUserProfile?.lastName].filter(Boolean).join(' ') || 
                        otherUser?.name || 
@@ -184,9 +197,12 @@ export const getConversations = query({
         otherUserAvatar: profileImageUrl,
         unreadCount: conv.unreadCounts[user._id] ?? 0,
         lastMessage: conv.lastMessage || "",
-      });
-    }
-    return conversationsWithDetails;
+        isDisputeConversation: !!report,
+        disputeStatus: report?.status,
+      };
+    }));
+
+    return conversationsWithDetails.filter((c): c is NonNullable<typeof c> => c !== null);
   },
 });
 
@@ -251,12 +267,12 @@ export const getMessages = query({
       .query("messages")
       .withIndex("by_conversation_created", (q) => q.eq("conversationId", args.conversationId))
       .filter((q) => q.eq(q.field("isDeleted"), false))
-      .order("asc") // إصلاح: direction فقط؛ يرتب حسب createdAt بفضل الـ index
-      .collect();
+      .order("desc") // OPTIMIZATION: Get the *newest* 100 messages first
+      .take(100);
 
-    // Add image URLs to messages that have images
+    // Reverse messages to show them in chronological order (oldest -> newest) and add image URLs
     return Promise.all(
-      messages.map(async (message) => {
+      messages.reverse().map(async (message) => {
         if (message.type === "image" && message.imageIds && message.imageIds.length > 0) {
           const imageUrls = await Promise.all(
             message.imageIds.map((id) => ctx.storage.getUrl(id))
@@ -335,6 +351,12 @@ export const sendMessage = mutation({
       updatedAt: Date.now(),
       unreadCounts: newUnreadCounts,
     });
+
+    // Update updatedAt in userConversations for all participants to bring chat to top
+    const userConvs = await ctx.db.query("userConversations").withIndex("by_conversation", q => q.eq("conversationId", args.conversationId)).collect();
+    for (const uc of userConvs) {
+      await ctx.db.patch(uc._id, { updatedAt: Date.now(), isArchived: false });
+    }
   },
 });
 
@@ -420,6 +442,14 @@ export const deleteMessages = mutation({
       if (message && message.senderId === user._id) {
         // Soft delete for better user experience
         await ctx.db.patch(messageId, { isDeleted: true, text: "This message was deleted" });
+        const conversation = await ctx.db.get(message.conversationId);
+        if (conversation?.isArchived) {
+          throw new ConvexError("Cannot delete messages from an archived conversation.");
+        }
+        // Optional: Add a time limit for editing, e.g., 5 minutes
+        if (Date.now() - message.createdAt > 5 * 60 * 1000) {
+          throw new ConvexError("You can no longer edit this message.");
+        }
       }
     }
   },
@@ -469,6 +499,10 @@ export const deleteConversations = mutation({
       const messages = await ctx.db.query("messages").withIndex("by_conversation_created", q => q.eq("conversationId", convId)).collect();
       await Promise.all(messages.map(msg => ctx.db.delete(msg._id)));
       await ctx.db.delete(convId);
+
+      // Delete from userConversations
+      const userConvs = await ctx.db.query("userConversations").withIndex("by_conversation", q => q.eq("conversationId", convId)).collect();
+      await Promise.all(userConvs.map(uc => ctx.db.delete(uc._id)));
     }
   },
 });
@@ -487,6 +521,10 @@ export const archiveConversations = mutation({
         throw new Error("Unauthorized to archive this conversation.");
       }
       await ctx.db.patch(convId, { isArchived: true });
+      
+      // Update userConversations
+      const userConvs = await ctx.db.query("userConversations").withIndex("by_conversation", q => q.eq("conversationId", convId)).collect();
+      await Promise.all(userConvs.map(uc => ctx.db.patch(uc._id, { isArchived: true })));
     }
   },
 });
@@ -518,34 +556,41 @@ export const getArchivedConversations = query({
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
 
-    const allArchived = await ctx.db
-      .query("conversations")
-      .filter(q => q.eq(q.field("isArchived"), true))
+    const userConvs = await ctx.db
+      .query("userConversations")
+      .withIndex("by_user_archived_updated", (q) => q.eq("userId", user._id).eq("isArchived", true))
       .order("desc")
-      .collect();
+      .take(50);
 
-    const archivedConversations = allArchived.filter(conv => conv.participants.includes(user._id));
+    // Deduplicate conversation IDs
+    const uniqueConversationIds = [...new Set(userConvs.map(uc => uc.conversationId))];
 
-    const conversationsWithDetails = [];
-    for (const conv of archivedConversations) {
+    const archivedConversations = (await Promise.all(uniqueConversationIds.map(id => ctx.db.get(id)))).filter((c): c is Doc<"conversations"> => c !== null);
+
+    const conversationsWithDetails = await Promise.all(archivedConversations.map(async (conv) => {
       const otherUserId = conv.participants.find((id) => id !== user._id) ?? user._id;
-      const otherUser = await ctx.db.get(otherUserId);
-      const otherUserProfile = await ctx.db
-        .query("userProfiles")
-        .withIndex("by_user", (q) => q.eq("userId", otherUserId))
-        .unique();
+      
+      const [otherUser, otherUserProfile, report] = await Promise.all([
+        ctx.db.get(otherUserId),
+        ctx.db.query("userProfiles").withIndex("by_user", (q) => q.eq("userId", otherUserId)).unique(),
+        conv.orderId ? ctx.db.query("reports").withIndex("by_order", q => q.eq("orderId", conv.orderId!)).first() : null
+      ]);
       
       const profileImageUrl = otherUserProfile?.profileImageId
         ? await ctx.storage.getUrl(otherUserProfile.profileImageId)
         : null;
+      
 
-      conversationsWithDetails.push({
+      return {
         ...conv,
         otherUserName: otherUser?.name ?? "Unknown User",
         otherUserAvatar: profileImageUrl,
         unreadCount: conv.unreadCounts[user._id] ?? 0,
-      });
-    }
+        isDisputeConversation: !!report,
+        disputeStatus: report?.status,
+      };
+    }));
+
     return conversationsWithDetails;
   },
 });
@@ -569,4 +614,26 @@ export const getBlockedUsers = query({
     );
     return blockedUsers.filter((u): u is Doc<"users"> & { avatar: string | null } => u !== null);
   },
+});
+
+// Migration mutation to backfill userConversations (Run this once from dashboard)
+export const migrateConversations = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const allConversations = await ctx.db.query("conversations").collect();
+    let count = 0;
+    for (const conv of allConversations) {
+      for (const userId of conv.participants) {
+        const existing = await ctx.db.query("userConversations")
+          .withIndex("by_user_updated", q => q.eq("userId", userId).eq("updatedAt", conv.updatedAt))
+          .filter(q => q.eq(q.field("conversationId"), conv._id))
+          .first();
+        if (!existing) {
+          await ctx.db.insert("userConversations", { userId, conversationId: conv._id, updatedAt: conv.updatedAt, isArchived: conv.isArchived ?? false });
+          count++;
+        }
+      }
+    }
+    return `Migrated ${count} user conversation entries.`;
+  }
 });

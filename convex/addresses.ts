@@ -1,5 +1,5 @@
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { validateToken } from "./util";
 import { Doc, Id } from "./_generated/dataModel";
 
@@ -39,14 +39,22 @@ export const addAddress = mutation({
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
     const { tokenIdentifier, ...addressData } = args;
+
+    // OPTIMIZATION: Fetch existing addresses once to check limit AND determine if it's the first one.
+    const existingAddresses = await ctx.db.query("userAddresses").withIndex("by_user", q => q.eq("userId", user._id)).collect();
+
+    // Security: Limit max addresses per user to prevent abuse
+    if (existingAddresses.length >= 10) {
+      throw new ConvexError("You have reached the maximum limit of 10 addresses. Please delete an old address to add a new one.");
+    }
+
     const addressId = await ctx.db.insert("userAddresses", {
       userId: user._id,
       ...addressData,
     });
 
     // If this is the first address, set it as default and sync to profile
-    const addresses = await ctx.db.query("userAddresses").withIndex("by_user", q => q.eq("userId", user._id)).collect();
-    if (addresses.length === 1) {
+    if (existingAddresses.length === 0) {
       const profile = await ctx.db.query("userProfiles").withIndex("by_user", q => q.eq("userId", user._id)).unique();
       if (profile) {
         await ctx.db.patch(profile._id, { defaultAddress: addressId, country: addressData.country, city: addressData.city });

@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action, internalMutation } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { validateToken } from "./util";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 
 export const createOrUpdatePromotion = mutation({
@@ -31,7 +32,10 @@ export const createOrUpdatePromotion = mutation({
 
     // Schedule an action to send notifications to followers
     if (args.status === 'active') {
-      await ctx.scheduler.runAfter(0, api.promotions.sendPromotionNotifications, { promotionId });
+      await ctx.scheduler.runAfter(0, internal.promotions.sendPromotionNotificationBatch, { 
+        promotionId,
+        storeName: store.name 
+      });
     }
 
     return { success: true };
@@ -41,17 +45,21 @@ export const createOrUpdatePromotion = mutation({
 export const getPromotionsByStore = query({
   args: {
     storeId: v.id("stores"),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const promotions = await ctx.db // This query should fetch ALL promotions for the given store for management purposes
+    const result = await ctx.db // This query should fetch ALL promotions for the given store for management purposes
       .query("promotions")
       .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
 
-    return Promise.all(
-      promotions.map(async (p) => ({ ...p, imageUrl: await ctx.storage.getUrl(p.imageId) }))
-    );
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map(async (p) => ({ ...p, imageUrl: await ctx.storage.getUrl(p.imageId) }))
+      )
+    };
   },
 });
 
@@ -79,6 +87,9 @@ export const getActivePromotions = query({
       storeQuery = storeQuery.filter((q) => q.eq(q.field("storeType"), args.storeType));
     }
 
+    // OPTIMIZATION: Instead of taking 20 immediately, we collect all stores in the region first.
+    // Since we are filtering by region/country, the dataset shouldn't be massive.
+    // This ensures we don't filter out valid stores just because they weren't in the first 20.
     let filteredStores = await storeQuery.collect();
 
     if (args.categories && args.categories.length > 0) {
@@ -90,6 +101,9 @@ export const getActivePromotions = query({
     if (filteredStores.length === 0) {
       return [];
     }
+
+    // Limit to a reasonable number of stores to check for promotions to avoid huge queries
+    filteredStores = filteredStores.slice(0, 50);
 
     const storeIds = filteredStores.map(s => s._id);
 
@@ -141,30 +155,41 @@ export const updatePromotion = mutation({
   },
 });
 
-export const sendPromotionNotifications = action({
+export const sendPromotionNotificationBatch = internalMutation({
   args: {
     promotionId: v.id("promotions"),
+    storeName: v.string(),
+    cursor: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const promotion = await ctx.runQuery(api.promotions.getPromotionById, { promotionId: args.promotionId });
-    if (!promotion) {
-      console.error(`Promotion ${args.promotionId} not found for sending notifications.`);
-      return;
+    const promotion = await ctx.db.get(args.promotionId);
+    if (!promotion) return;
+
+    const BATCH_SIZE = 50;
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("follows")
+      .withIndex("by_store", (q) => q.eq("storeId", promotion.storeId))
+      .paginate({ cursor: args.cursor ?? null, numItems: BATCH_SIZE });
+
+    if (page.length > 0) {
+      await Promise.all(page.map(follow =>
+        ctx.db.insert("notifications", {
+          userId: follow.userId,
+          storeId: promotion.storeId,
+          message: `New offer from ${args.storeName}: ${promotion.title}`,
+          type: "promotion",
+          isRead: false,
+        })
+      ));
     }
 
-    const followers = await ctx.runQuery(api.follows.getFollowers, { storeId: promotion.storeId });
-
-    // Create a notification for each follower
-    await Promise.all(
-      followers.map((follower: Doc<"users">) => {
-        return ctx.runMutation(api.notifications.create, {
-          userId: follower._id,
-          storeId: promotion.storeId,
-          message: `New offer from ${promotion.storeName}: ${promotion.title}`,
-          type: "promotion",
-        });
-      })
-    );
+    if (!isDone) {
+      await ctx.scheduler.runAfter(0, internal.promotions.sendPromotionNotificationBatch, {
+        promotionId: args.promotionId,
+        storeName: args.storeName,
+        cursor: continueCursor,
+      });
+    }
   },
 });
 

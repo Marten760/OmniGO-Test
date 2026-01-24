@@ -1,6 +1,8 @@
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { validateToken } from "./util";
+import { paginationOptsValidator } from "convex/server";
+import { Doc } from "./_generated/dataModel";
 
 // Query to check if a store is favorited by the current user
 export const isFavorite = query({
@@ -40,6 +42,16 @@ export const toggleFavorite = mutation({
       await ctx.db.delete(existingFavorite._id);
       return { isFavorited: false };
     } else {
+      // Security: Limit max favorites per user to prevent abuse
+      const currentFavoritesCount = (await ctx.db
+        .query("storeFavorites")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .take(100)).length;
+
+      if (currentFavoritesCount >= 100) {
+        throw new ConvexError("You have reached the maximum limit of 100 favorite stores.");
+      }
+
       await ctx.db.insert("storeFavorites", {
         userId: user._id,
         storeId: args.storeId,
@@ -51,23 +63,27 @@ export const toggleFavorite = mutation({
 
 // Query to get all favorite stores for a user
 export const getFavoriteStores = query({
-  args: { tokenIdentifier: v.string() },
+  args: { 
+    tokenIdentifier: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
-    const favorites = await ctx.db.query("storeFavorites").withIndex("by_user", q => q.eq("userId", user._id)).collect();
+    const result = await ctx.db.query("storeFavorites").withIndex("by_user", q => q.eq("userId", user._id)).paginate(args.paginationOpts);
     
-    const storesWithImages = await Promise.all(
-      favorites.map(async (fav) => {
-        const store = await ctx.db.get(fav.storeId);
-        if (!store) return null;
-        return {
-          ...store,
-          logoImageUrl: store.logoImageId ? await ctx.storage.getUrl(store.logoImageId) : null,
-          galleryImageUrl: store.galleryImageIds && store.galleryImageIds.length > 0 ? await ctx.storage.getUrl(store.galleryImageIds[0]) : null,
-        };
-      })
-    );
-
-    return storesWithImages.filter(Boolean); // Filter out any nulls if a store was deleted
+    return {
+      ...result,
+      page: (await Promise.all(
+        result.page.map(async (fav) => {
+          const store = await ctx.db.get(fav.storeId);
+          if (!store) return null;
+          return {
+            ...store,
+            logoImageUrl: store.logoImageId ? await ctx.storage.getUrl(store.logoImageId) : null,
+            galleryImageUrl: store.galleryImageIds && store.galleryImageIds.length > 0 ? await ctx.storage.getUrl(store.galleryImageIds[0]) : null,
+          };
+        })
+      )).filter((s): s is NonNullable<typeof s> => s !== null)
+    };
   },
 });

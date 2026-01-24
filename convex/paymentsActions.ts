@@ -77,6 +77,10 @@ export const approvePiPayment = action({
     const user = await ctx.runQuery(internal.users.getUser, { tokenIdentifier });
     if (!user) throw new Error("User must be authenticated to approve a payment.");
 
+    if (!amount || amount <= 0) {
+      throw new Error("Invalid payment amount. Amount must be greater than 0.");
+    }
+
     const useSandbox = process.env.PI_SANDBOX === 'true';
     const baseUrl = PI_PLATFORM_API_BASE;
     const piApiUrl = `${baseUrl}/v2/me`;
@@ -114,6 +118,30 @@ export const approvePiPayment = action({
     if (piApiUser.uid !== userProfile.piUid) {
       throw new Error("Pi user ID mismatch during payment approval.");
     }
+
+    // --- Inventory Check ---
+    // Extract items from metadata to validate stock before approving payment
+    const itemsToCheck: any[] = [];
+    if (metadata.items) {
+      itemsToCheck.push(...metadata.items.map((item: any) => ({
+        productId: item.id,
+        quantity: item.quantity,
+        options: item.options
+      })));
+    } else if (metadata.productId) {
+      itemsToCheck.push({
+        productId: metadata.productId,
+        quantity: 1,
+        options: metadata.options
+      });
+    }
+
+    if (itemsToCheck.length > 0) {
+      await ctx.runQuery(internal.inventory.checkInventoryAvailability, {
+        items: itemsToCheck
+      });
+    }
+    // -----------------------
 
     // --- Delivery Zone Validation ---
     // Ensure the user is in a valid delivery zone if the payment is for a store order
@@ -381,13 +409,23 @@ export const completePiPayment = action({
         txid: txid || payment.transaction?.txid,
       });
 
-      // Process order/payout (payment arg is unused in the mutation, but pass for consistency)
-      await ctx.runMutation(internal.paymentsQueries.processCompletedPayment, {
-        paymentId,
-        payment: { ...payment, txid: txid || payment.transaction?.txid },
-      });
-
-      // Webhook will fire shortly after /complete and can act as backup (idempotent)
+      // Process order/payout
+      // CRITICAL: Wrap this in a separate try-catch. If order creation fails, 
+      // we MUST NOT mark the payment as 'failed' because the money has already moved on the blockchain.
+      try {
+        await ctx.runMutation(internal.paymentsQueries.processCompletedPayment, {
+          paymentId,
+          payment: { ...payment, txid: txid || payment.transaction?.txid },
+        });
+      } catch (orderError: any) {
+        console.error(`CRITICAL: Order creation failed for COMPLETED payment ${paymentId}:`, orderError);
+        // Update failure reason but keep status as completed so admins can investigate
+        await ctx.runMutation(internal.paymentsQueries.updatePaymentStatus, {
+          paymentId,
+          status: 'completed', 
+          failureReason: `Order creation failed: ${orderError.message}`
+        });
+      }
 
       return { success: true, message: 'Payment completed successfully', payment, txid: txid || payment.transaction?.txid };
     } catch (error: any) {

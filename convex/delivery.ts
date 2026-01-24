@@ -36,12 +36,16 @@ export const getAssignedOrders = query({
     );
 
     // Get all orders assigned to this driver that are 'out_for_delivery'
+    // OPTIMIZATION: Use 'by_status' index to avoid full table scan on 'driverId'.
+    // Fetching active deliveries is much faster than scanning all history.
     const assignedOrders = await ctx.db
       .query("orders")
+      .withIndex("by_status", (q) => q.eq("status", "out_for_delivery"))
       .filter(q => q.eq(q.field("driverId"), user._id))
-      .filter(q => q.eq(q.field("status"), "out_for_delivery"))
-      .order("desc")
       .collect();
+    
+    // Sort in memory (newest first)
+    assignedOrders.sort((a, b) => b._creationTime - a._creationTime);
 
     return {
         assignedStores: assignedStores.filter(Boolean), // Filter out nulls if a store was deleted

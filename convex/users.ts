@@ -1,6 +1,7 @@
 import { internalQuery, query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { paginationOptsValidator } from "convex/server";
 import { validateToken } from "./util";
 
 /**
@@ -22,11 +23,11 @@ export const getUser = internalQuery({
  * Internal query to retrieve a user's profile by their user ID.
  */
 export const getProfile = internalQuery({
-  args: { userId: v.union(v.id("users"), v.string()) }, // Allow string for ownerId from store
+  args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
     return await ctx.db
       .query("userProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId as Id<"users">)) // Cast to ensure type safety
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
   },
 });
@@ -68,23 +69,19 @@ export const getUserByPiUid = query({
 /**
  * Get all users (for admin purposes)
  */
-export const getAllUsers = mutation({
-  args: { tokenIdentifier: v.string() },
+export const getAllUsers = query({
+  args: { 
+    tokenIdentifier: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
     // Secure admin check using the 'role' field
     if (user.role !== "admin") {
-      return [];
+      throw new ConvexError("Unauthorized: Admin access required.");
     }
     
     // Only allow authenticated users to see basic user list
-    const users = await ctx.db.query("users").collect();
-    
-    // Return limited user info for privacy
-    return users.map(user => ({
-      _id: user._id,
-      name: user.name,
-      _creationTime: user._creationTime,
-    }));
+    return await ctx.db.query("users").order("desc").paginate(args.paginationOpts);
   },
 });

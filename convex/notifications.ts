@@ -1,5 +1,6 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
 import { validateToken } from "./util";
 
@@ -15,33 +16,39 @@ export const getUnreadNotifications = query({
       .query("notifications")
       .withIndex("by_user_read_status", (q) => q.eq("userId", user._id).eq("isRead", false))
       .order("desc")
-      .collect();
+      .take(50); // OPTIMIZATION: Limit unread count fetch to 50
   },
 });
 
 export const getNotifications = query({
-  args: { tokenIdentifier: v.optional(v.string()) },
+  args: { 
+    tokenIdentifier: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
-    if (!args.tokenIdentifier) return [];
+    if (!args.tokenIdentifier) return { page: [], isDone: true, continueCursor: "" };
     const user = await validateToken(ctx, args.tokenIdentifier).catch(() => null);
-    if (!user) return [];
+    if (!user) return { page: [], isDone: true, continueCursor: "" };
 
-    const notifications = await ctx.db
+    const result = await ctx.db
       .query("notifications")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
 
     // Enrich notifications with store names
-    return Promise.all(
-      notifications.map(async (n) => {
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map(async (n) => {
         const store = n.storeId ? await ctx.db.get(n.storeId) : null;
         return {
           ...n,
           storeName: store?.name,
         };
       })
-    );
+      )
+    };
   },
 });
 
@@ -82,7 +89,8 @@ export const markAllAsRead = mutation({
   },
 });
 
-export const create = mutation({
+// Security: Make this internal so clients cannot spam notifications to other users.
+export const create = internalMutation({
   args: {
     userId: v.id("users"),
     storeId: v.optional(v.id("stores")),

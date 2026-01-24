@@ -41,6 +41,7 @@ const applicationTables = {
     priceRange: v.array(v.string()), // Changed to array: ["$", "$$"]
     rating: v.number(),
     totalReviews: v.number(),
+    totalProducts: v.optional(v.number()),
     logoImageId: v.optional(v.id("_storage")), // Renamed for clarity
     galleryImageIds: v.optional(v.array(v.id("_storage"))), // For multiple store images
     country: v.string(),
@@ -74,6 +75,7 @@ const applicationTables = {
     isDeliveryRegionsAllowList: v.optional(v.boolean()), // true = allow only these, false = block these
   })
     .index("by_region", ["country", "region"])
+    .index("by_region_type", ["country", "region", "storeType"]) // فهرس جديد للبحث السريع
     .index("by_categories", ["categories"]) // Corrected index name for consistency
     .index("by_rating", ["rating"])
     .index("by_trending", ["isTrending", "country", "region"])
@@ -413,6 +415,16 @@ const applicationTablesWithDiscounts = {
   })
     .index("by_conversation", ["conversationId"])
     .index("by_conversation_created", ["conversationId", "createdAt"]), // index جديد للترتيب الفعال
+
+  userConversations: defineTable({
+    userId: v.id("users"),
+    conversationId: v.id("conversations"),
+    updatedAt: v.number(),
+    isArchived: v.optional(v.boolean()),
+  })
+    .index("by_user_updated", ["userId", "updatedAt"])
+    .index("by_user_archived_updated", ["userId", "isArchived", "updatedAt"])
+    .index("by_conversation", ["conversationId"]),
 };
 
 const payoutTables = {

@@ -1,24 +1,26 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { validateToken } from "./util";
 
 export const getOrdersByUser = query({
-  args: { tokenIdentifier: v.optional(v.string()) },
+  args: { 
+    tokenIdentifier: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
     if (!args.tokenIdentifier) {
-      return [];
+      return { page: [], isDone: true, continueCursor: "" };
     }
     const user = await validateToken(ctx, args.tokenIdentifier);
 
-    const orders = await ctx.db
+    return await ctx.db
       .query("orders")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
-      .collect();
-
-    return orders;
+      .paginate(args.paginationOpts);
   },
 });
 
@@ -238,10 +240,10 @@ export const createOrderFromPayment = internalMutation({
                 const choiceIndex = newOptions[optionIndex].choices.findIndex(c => c.name === selectedChoiceName);
                 if (choiceIndex !== -1) {
                   const choice = newOptions[optionIndex].choices[choiceIndex];
-                  if (choice.quantity === undefined || choice.quantity < item.quantity) {
-                    throw new ConvexError(`Not enough stock for ${product.name} - ${choice.name}.`);
-                  }
-                  choice.quantity -= item.quantity;
+                  // CRITICAL: Since payment is confirmed, we MUST create the order even if stock is low.
+                  // We allow negative stock (overselling) rather than failing the order creation after payment.
+                  const currentChoiceQty = choice.quantity ?? 0;
+                  choice.quantity = currentChoiceQty - item.quantity;
                   optionsUpdated = true;
                 }
               }
@@ -252,10 +254,9 @@ export const createOrderFromPayment = internalMutation({
           }
         } else {
           // Case 2: Product has no options, decrement top-level quantity
-          if (product.quantity === undefined || product.quantity < item.quantity) {
-            throw new ConvexError(`Not enough stock for ${product.name}.`);
-          }
-          await ctx.db.patch(product._id, { quantity: product.quantity - item.quantity });
+          // CRITICAL: Allow negative stock for confirmed payments to ensure order creation.
+          const currentQty = product.quantity ?? 0;
+          await ctx.db.patch(product._id, { quantity: currentQty - item.quantity });
         }
       }
     }

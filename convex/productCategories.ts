@@ -8,7 +8,7 @@ const checkOwnership = async (ctx: MutationCtx | QueryCtx, tokenIdentifier: stri
     const user = await validateToken(ctx, tokenIdentifier);
     const store = await ctx.db.get(storeId);
     if (!store || store.ownerId !== user.tokenIdentifier) {
-        throw new Error("You do not have permission for this store.");
+        throw new ConvexError("You do not have permission for this store.");
     }
     return true;
 };
@@ -33,7 +33,7 @@ export const addCategory = mutation({
         await checkOwnership(ctx, tokenIdentifier, storeId);
         const trimmedName = name.trim();
         if (!trimmedName) {
-            throw new Error("Category name cannot be empty.");
+            throw new ConvexError("Category name cannot be empty.");
         }
 
         // Check for duplicates (case-insensitive) for the same store
@@ -43,7 +43,7 @@ export const addCategory = mutation({
             .collect();
         
         if (existing.some(cat => cat.name.toLowerCase() === trimmedName.toLowerCase())) {
-            throw new Error(`Category "${trimmedName}" already exists for this store.`);
+            throw new ConvexError(`Category "${trimmedName}" already exists for this store.`);
         }
 
         return await ctx.db.insert("productCategories", {
@@ -62,13 +62,13 @@ export const updateCategory = mutation({
   handler: async (ctx, args) => {
     const category = await ctx.db.get(args.categoryId);
     if (!category) {
-      throw new Error("Category not found.");
+      throw new ConvexError("Category not found.");
     }
     await checkOwnership(ctx, args.tokenIdentifier, category.storeId);
 
     const trimmedNewName = args.newName.trim();
     if (!trimmedNewName) {
-        throw new Error("Category name cannot be empty.");
+        throw new ConvexError("Category name cannot be empty.");
     }
 
     // Check if the new name already exists in the same store
@@ -79,7 +79,7 @@ export const updateCategory = mutation({
         .filter(q => q.neq(q.field("_id"), args.categoryId)) // Exclude the current category
         .first();
     if (existing) {
-        throw new Error(`Category "${trimmedNewName}" already exists for this store.`);
+        throw new ConvexError(`Category "${trimmedNewName}" already exists for this store.`);
     }
 
     const oldCategoryName = category.name;
@@ -104,7 +104,7 @@ export const deleteCategory = mutation({
     handler: async (ctx, { tokenIdentifier, categoryId }) => {
         const category = await ctx.db.get(categoryId);
         if (!category) {
-            throw new Error("Category not found.");
+            throw new ConvexError("Category not found.");
         }
         await checkOwnership(ctx, tokenIdentifier, category.storeId);
 
@@ -116,7 +116,7 @@ export const deleteCategory = mutation({
             .first();
 
         if (itemsInCategory) {
-            throw new Error(`Cannot delete category "${category.name}" as it is currently used by one or more products.`);
+            throw new ConvexError(`Cannot delete category "${category.name}" as it is currently used by one or more products.`);
         }
 
         await ctx.db.delete(categoryId);

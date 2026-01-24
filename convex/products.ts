@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { Doc } from "./_generated/dataModel";
 import { validateToken } from "./util";
 
@@ -7,6 +8,7 @@ export const getProductsByStore = query({
   args: { 
     storeId: v.id("stores"),
     category: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     let query = ctx.db
@@ -17,29 +19,17 @@ export const getProductsByStore = query({
       query = query.filter((q) => q.eq(q.field("category"), args.category));
     }
 
-    const products = await query.collect();
-
-    // Group by category
-    const groupedItems: Record<string, any[]> = {};
-    
-    const itemsWithImages = await Promise.all(
-      products.map(async (product) => {
-        const imageUrls = product.imageIds ? await Promise.all(product.imageIds.map(id => ctx.storage.getUrl(id))) : [];
-        return {
-          ...product,
-          imageUrls: imageUrls.filter((url): url is string => url !== null),
-        };
-      })
-    );
-    
-    itemsWithImages.forEach(item => {
-      if (!groupedItems[item.category]) {
-        groupedItems[item.category] = [];
-      }
-      groupedItems[item.category].push(item);
-    });
-    
-    return groupedItems;
+    const result = await query.paginate(args.paginationOpts);
+    return {
+        ...result,
+        page: await Promise.all(result.page.map(async (product) => {
+            const imageUrls = product.imageIds ? await Promise.all(product.imageIds.map(id => ctx.storage.getUrl(id))) : [];
+            return {
+                ...product,
+                imageUrls: imageUrls.filter((url): url is string => url !== null),
+            };
+        }))
+    };
   },
 });
 
@@ -49,7 +39,7 @@ export const getStoreProductsFlat = query({
     const products = await ctx.db
       .query("products")
       .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
-      .collect();
+      .take(500); // OPTIMIZATION: Limit to 500 to prevent OOM. Use pagination for full lists.
 
     return Promise.all(
       products.map(async (product) => {
@@ -93,8 +83,11 @@ export const addProduct = mutation({
 
     const store = await ctx.db.get(args.storeId);
     if (!store || store.ownerId !== user.tokenIdentifier) {
-      throw new Error("You do not have permission to add products to this store.");
+      throw new ConvexError("You do not have permission to add products to this store.");
     }
+
+    if (args.price < 0) throw new ConvexError("Price cannot be negative.");
+    if (args.quantity !== undefined && args.quantity < 0) throw new ConvexError("Quantity cannot be negative.");
 
     const dietaryInfo: string[] = [];
     if (args.isVegetarian) dietaryInfo.push("Vegetarian");
@@ -103,7 +96,7 @@ export const addProduct = mutation({
 
     const { isVegetarian, isVegan, isGlutenFree, ...restArgs } = args;
 
-    return await ctx.db.insert("products", {
+    const productId = await ctx.db.insert("products", {
       storeId: args.storeId,
       name: args.name,
       description: args.description,
@@ -118,6 +111,13 @@ export const addProduct = mutation({
       isPopular: false, // Default value
       ingredients: [], // Default value
     });
+
+    // OPTIMIZATION: Increment the store's totalProducts counter
+    await ctx.db.patch(args.storeId, {
+      totalProducts: (store.totalProducts ?? 0) + 1,
+    });
+
+    return productId;
   },
 });
 
@@ -152,13 +152,16 @@ export const updateProduct = mutation({
     const { productId, tokenIdentifier, isVegetarian, isVegan, isGlutenFree, ...rest } = args;
     const product = await ctx.db.get(productId);
     if (!product) {
-      throw new Error("Product not found.");
+      throw new ConvexError("Product not found.");
     }
 
     const store = await ctx.db.get(product.storeId);
     if (!store || store.ownerId !== user.tokenIdentifier) {
-      throw new Error("You do not have permission to update products for this store.");
+      throw new ConvexError("You do not have permission to update products for this store.");
     }
+
+    if (args.price < 0) throw new ConvexError("Price cannot be negative.");
+    if (args.quantity !== undefined && args.quantity < 0) throw new ConvexError("Quantity cannot be negative.");
 
     const dietaryInfo: string[] = [];
     if (isVegetarian) dietaryInfo.push("Vegetarian");
@@ -235,7 +238,7 @@ export const deleteProduct = mutation({
 
     const store = await ctx.db.get(product.storeId);
     if (!store || store.ownerId !== user.tokenIdentifier) {
-      throw new Error("You do not have permission to delete products from this store.");
+      throw new ConvexError("You do not have permission to delete products from this store.");
     }
 
     if (product.imageId) {
@@ -245,6 +248,11 @@ export const deleteProduct = mutation({
       await Promise.all(product.imageIds.map((id) => ctx.storage.delete(id)));
     }
     await ctx.db.delete(args.productId);
+
+    // OPTIMIZATION: Decrement the store's totalProducts counter
+    await ctx.db.patch(product.storeId, {
+      totalProducts: Math.max(0, (store.totalProducts ?? 0) - 1),
+    });
   },
 });
 
@@ -309,19 +317,25 @@ export const getDiverseProducts = query({
     let storeQuery;
     // Apply location filters if provided
     if (args.country && args.region) {
-      storeQuery = ctx.db
-        .query("stores")
-        .withIndex("by_region", (q) => q.eq("country", args.country!).eq("region", args.region!));
+      if (args.storeType) {
+        // OPTIMIZATION: Use the composite index for direct lookup
+        storeQuery = ctx.db
+          .query("stores")
+          .withIndex("by_region_type", (q) => q.eq("country", args.country!).eq("region", args.region!).eq("storeType", args.storeType as any));
+      } else {
+        storeQuery = ctx.db
+          .query("stores")
+          .withIndex("by_region", (q) => q.eq("country", args.country!).eq("region", args.region!));
+      }
     } else {
       storeQuery = ctx.db.query("stores");
+      // Fallback filter if no location provided (rare case)
+      if (args.storeType) {
+        storeQuery = storeQuery.filter((q) => q.eq(q.field("storeType"), args.storeType));
+      }
     }
 
-    // Apply storeType filter
-    if (args.storeType) {
-      storeQuery = storeQuery.filter((q) => q.eq(q.field("storeType"), args.storeType));
-    }
-
-    let filteredStores = await storeQuery.collect();
+    let filteredStores = await storeQuery.take(20); // OPTIMIZATION: Reduced to 20 to lower load on high traffic
 
     // Post-fetch filtering for categories (intersection)
     if (args.categories && args.categories.length > 0) {
@@ -337,12 +351,19 @@ export const getDiverseProducts = query({
     // 2. Collect unique store IDs
     const storeIds = filteredStores.map(s => s._id);
 
-    // 3. Fetch recent products from these filtered stores
-    const products = await ctx.db
-      .query("products")
-      .order("desc") // Get most recent products overall
-      .filter(q => q.or(...storeIds.map(id => q.eq(q.field("storeId"), id))))
-      .take(limit);
+    // 3. OPTIMIZED: Fetch recent products from each store individually instead of scanning all products
+    // This avoids a full table scan on the products table which would be disastrous with 1M products.
+    const productsPromises = storeIds.map(id => 
+      ctx.db.query("products")
+        .withIndex("by_store", q => q.eq("storeId", id))
+        .order("desc")
+        .take(3) // Take top 3 from each store to ensure diversity and performance
+    );
+
+    const productsPerStore = await Promise.all(productsPromises);
+    
+    // Flatten, sort by creation time (descending), and take the limit
+    const products = productsPerStore.flat().sort((a, b) => b._creationTime - a._creationTime).slice(0, limit);
 
     const storesMap = new Map(filteredStores.map(store => [store._id, store]));
 

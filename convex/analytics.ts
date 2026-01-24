@@ -47,18 +47,15 @@ export const getStoreAnalytics = query({
         startTime = now - (30 * 24 * 60 * 60 * 1000);
     }
 
+    // OPTIMIZATION: Limit the number of orders fetched to prevent OOM on large stores.
+    // We analyze the most recent 2000 orders within the period.
     // Get orders for the period
     const orders = await ctx.db
       .query("orders")
       .withIndex("by_store_creation_time", (q) => q.eq("storeId", args.storeId))
+      .order("desc") // Ensure we get the latest ones
       .filter((q) => q.gte(q.field("_creationTime"), startTime))
-      .collect();
-
-    // Get products for the store
-    const products = await ctx.db
-      .query("products")
-      .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
-      .collect();
+      .take(2000);
 
     // Calculate analytics
     const totalOrders = orders.length;
@@ -116,7 +113,7 @@ export const getStoreAnalytics = query({
         totalOrders,
         totalRevenue,
         averageOrderValue,
-        totalProducts: products.length,
+        totalProducts: store.totalProducts || 0, // OPTIMIZATION: Use stored count
         uniqueCustomers,
         returningCustomers: returningCustomerCount,
         customerRetentionRate: uniqueCustomers > 0 ? (returningCustomerCount / uniqueCustomers) * 100 : 0,
@@ -146,17 +143,13 @@ export const getStorePerformanceMetrics = query({
       throw new Error("Not authorized to view metrics for this store");
     }
 
+    // OPTIMIZATION: Limit to last 1000 orders for performance metrics
     // Get all orders for the store
     const allOrders = await ctx.db
       .query("orders")
       .withIndex("by_store_creation_time", (q) => q.eq("storeId", args.storeId))
-      .collect();
-
-    // Get reviews for the store
-    const reviews = await ctx.db
-      .query("reviews")
-      .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
-      .collect();
+      .order("desc")
+      .take(1000);
 
     // Calculate metrics
     const totalOrders = allOrders.length;
@@ -179,14 +172,9 @@ export const getStorePerformanceMetrics = query({
       : 0;
 
     // Review metrics
-    const averageRating = reviews.length > 0 
-      ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
-      : 0;
-
-    const ratingDistribution = reviews.reduce((acc, review) => {
-      acc[review.rating] = (acc[review.rating] || 0) + 1;
-      return acc;
-    }, {} as Record<number, number>);
+    // OPTIMIZATION: Use stored aggregates from the store object
+    const averageRating = store.rating || 0;
+    const totalReviews = store.totalReviews || 0;
 
     return {
       orders: {
@@ -200,9 +188,8 @@ export const getStorePerformanceMetrics = query({
         averageTimeMinutes: Math.round(averageDeliveryTime / (1000 * 60)),
       },
       reviews: {
-        total: reviews.length,
+        total: totalReviews,
         averageRating,
-        ratingDistribution,
       },
       store: {
         name: store.name,
@@ -237,14 +224,14 @@ export const getDashboardSummary = query({
       .query("orders")
       .withIndex("by_store_creation_time", (q) => q.eq("storeId", args.storeId))
       .filter((q) => q.gte(q.field("_creationTime"), todayStart.getTime()))
-      .collect();
+      .take(500); // Limit today's orders fetch
 
     // Get this week's orders
     const weekOrders = await ctx.db
       .query("orders")
       .withIndex("by_store_creation_time", (q) => q.eq("storeId", args.storeId))
       .filter((q) => q.gte(q.field("_creationTime"), weekStart))
-      .collect();
+      .take(1000); // Limit week's orders fetch
 
     // Get pending orders
     const pendingOrders = await ctx.db
@@ -252,13 +239,13 @@ export const getDashboardSummary = query({
       .withIndex("by_store_creation_time", (q) => q.eq("storeId", args.storeId))
       .filter((q) => q.neq(q.field("status"), "delivered"))
       .filter((q) => q.neq(q.field("status"), "cancelled"))
-      .collect();
+      .take(100); // Limit pending orders fetch
 
     // Get products count
     const products = await ctx.db
       .query("products")
       .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
-      .collect();
+      .take(2000); // Limit products fetch for active/inactive count
 
     const activeProducts = products.filter(p => p.isAvailable).length;
 

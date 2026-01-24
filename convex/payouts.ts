@@ -1,6 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { validateToken } from "./util";
+import { paginationOptsValidator } from "convex/server";
 
 /**
  * Fetches the payout history for a specific store.
@@ -10,6 +11,7 @@ export const getPayoutsByStore = query({
   args: {
     tokenIdentifier: v.string(),
     storeId: v.id("stores"),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     // 1. Authenticate and authorize the user
@@ -21,15 +23,18 @@ export const getPayoutsByStore = query({
     }
 
     // 2. Fetch payouts for the store, most recent first
-    const payouts = await ctx.db
+    const result = await ctx.db
       .query("payouts")
       .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
 
-    return payouts.map((p) => ({
-      ...p,
-      amount: parseFloat(p.amount.toFixed(6)),
-    }));
+    return {
+      ...result,
+      page: result.page.map((p) => ({
+        ...p,
+        amount: parseFloat(p.amount.toFixed(6)),
+      })),
+    };
   },
 });

@@ -1,5 +1,5 @@
 import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { validateToken } from "./util";
 
 export const createSupportTicket = mutation({
@@ -12,10 +12,10 @@ export const createSupportTicket = mutation({
     const user = await validateToken(ctx, args.tokenIdentifier);
 
     if (args.subject.length < 5) {
-      throw new Error("Subject must be at least 5 characters long.");
+      throw new ConvexError("Subject must be at least 5 characters long.");
     }
     if (args.message.length < 20) {
-      throw new Error("Message must be at least 20 characters long.");
+      throw new ConvexError("Message must be at least 20 characters long.");
     }
 
     await ctx.db.insert("supportTickets", {

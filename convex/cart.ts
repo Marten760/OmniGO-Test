@@ -19,7 +19,7 @@ export const getCartItems = query({
     if (cartItems.length === 0) return [];
 
     // Efficiently fetch all product details in one go to avoid N+1 queries.
-    const productIds = cartItems.map(item => item.productId);
+    const productIds = [...new Set(cartItems.map(item => item.productId))]; // Deduplicate IDs
     // Select specific fields to ensure `imageId` is included and for efficiency.
     const products = await ctx.db
       .query("products")
@@ -97,6 +97,11 @@ export const addItemToCart = mutation({
       const newQuantity = existingItem.quantity + args.quantity;
       await ctx.db.patch(existingItem._id, { quantity: newQuantity });
     } else {
+      // Security: Limit cart size to prevent abuse (e.g., max 50 unique items)
+      if (currentCart.length >= 50) {
+        throw new ConvexError("Cart is full (max 50 items). Please remove items to add more.");
+      }
+
       // Insert new item if it doesn't exist
       await ctx.db.insert("cartItems", {
         userId: user._id,

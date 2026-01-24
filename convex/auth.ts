@@ -64,8 +64,6 @@ export const updateUserProfile = mutation({
     dietaryPreferences: v.optional(v.array(v.string())),
     favoritesCuisines: v.optional(v.array(v.string())),
     piWalletAddress: v.optional(v.string()),
-    country: v.optional(v.string()),
-    city: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
@@ -97,8 +95,6 @@ export const updateUserProfile = mutation({
       dietaryPreferences: args.dietaryPreferences ?? profile?.dietaryPreferences ?? [],
       favoritesCuisines: args.favoritesCuisines ?? profile?.favoritesCuisines ?? [],
       walletAddress: args.piWalletAddress ?? profile?.walletAddress,
-      country: args.country ?? profile?.country,
-      city: args.city ?? profile?.city,
     };
     
     // Only update the wallet address if a valid one is provided.
@@ -266,6 +262,7 @@ export const createOrUpdateUser = internalMutation({
       };
 
       // Only update wallet address if a new one is provided.
+      // If Pi SDK returns null/undefined, keep the existing one to prevent data loss.
       if (walletAddress) {
         profileUpdateData.walletAddress = walletAddress;
       }

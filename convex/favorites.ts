@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { validateToken } from "./util";
 import { Id } from "./_generated/dataModel";
 
@@ -41,6 +42,16 @@ export const toggleFavorite = mutation({
       await ctx.db.delete(existingFavorite._id);
       return { isFavorited: false };
     } else {
+      // Security: Limit max favorites per user to prevent abuse
+      const currentFavoritesCount = (await ctx.db
+        .query("productFavorites")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .take(25)).length;
+
+      if (currentFavoritesCount >= 100) {
+        throw new ConvexError("You have reached the maximum limit of 100 favorite products.");
+      }
+
       await ctx.db.insert("productFavorites", {
         userId: user._id,
         productId: args.productId,
@@ -52,13 +63,18 @@ export const toggleFavorite = mutation({
 
 // Query to get all favorite products for a user
 export const getFavoriteProducts = query({
-  args: { tokenIdentifier: v.string() },
+  args: { 
+    tokenIdentifier: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
-    const favorites = await ctx.db.query("productFavorites").withIndex("by_user", q => q.eq("userId", user._id)).collect();
+    const result = await ctx.db.query("productFavorites").withIndex("by_user", q => q.eq("userId", user._id)).order("desc").paginate(args.paginationOpts);
     
-    const products = await Promise.all(
-      favorites.map(async (fav) => {
+    return {
+      ...result,
+      page: (await Promise.all(
+        result.page.map(async (fav) => {
         const product = await ctx.db.get(fav.productId);
         if (!product) return null;        
         const store = await ctx.db.get(product.storeId);
@@ -70,8 +86,8 @@ export const getFavoriteProducts = query({
           storeId: store?._id,
           imageUrls: imageUrls.filter((url): url is string => url !== null),
         };
-      })
-    );
-    return products.filter(Boolean); // Filter out any nulls if a product was deleted
+        })
+      )).filter((p): p is NonNullable<typeof p> => p !== null)
+    };
   },
 });

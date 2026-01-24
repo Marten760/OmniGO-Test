@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { validateToken } from "./util";
 import { Id } from "./_generated/dataModel";
 
@@ -7,18 +8,23 @@ import { Id } from "./_generated/dataModel";
 
 // Query to get all reviews for a specific user
 export const getUserReviews = query({
-  args: { tokenIdentifier: v.string() },
+  args: { 
+    tokenIdentifier: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
   handler: async (ctx, args) => {
     const user = await validateToken(ctx, args.tokenIdentifier);
-    const reviews = await ctx.db
+    const result = await ctx.db
       .query("reviews")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
 
     // Join with store data
-    return Promise.all(
-      reviews.map(async (review) => {
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map(async (review) => {
         const store = await ctx.db.get(review.storeId);
         const imageUrls = review.imageIds
           ? await Promise.all(review.imageIds.map((id) => ctx.storage.getUrl(id)))
@@ -30,7 +36,8 @@ export const getUserReviews = query({
           imageUrls: imageUrls.filter((url): url is string => url !== null),
         };
       })
-    );
+      )
+    };
   },
 });
 
@@ -71,18 +78,15 @@ export const getStoreReviews = query({
 
     if (reviews.length === 0) return [];
 
-    // Efficiently fetch all user and profile data in fewer queries
-    const userIds = [...new Set(reviews.map(r => r.userId))];
-    const users = await ctx.db.query("users").filter(q => q.or(...userIds.map(id => q.eq(q.field("_id"), id)))).collect();
-    const profiles = await ctx.db.query("userProfiles").filter(q => q.or(...userIds.map(id => q.eq(q.field("userId"), id)))).collect();
-
-    const usersById = new Map(users.map(u => [u._id, u]));
-    const profilesByUserId = new Map(profiles.map(p => [p.userId, p]));
-
     return Promise.all(
       reviews.map(async (review) => {
-        const user = usersById.get(review.userId);
-        const userProfile = profilesByUserId.get(review.userId);
+        // OPTIMIZATION: Fetch user details individually. 
+        // Using .filter(q => q.or(...)) with many IDs can hit query limits.
+        // Convex handles parallel get/query requests efficiently.
+        const [user, userProfile] = await Promise.all([
+          ctx.db.get(review.userId),
+          ctx.db.query("userProfiles").withIndex("by_user", q => q.eq("userId", review.userId)).unique()
+        ]);
         const userImage = userProfile?.profileImageId ? await ctx.storage.getUrl(userProfile.profileImageId) : null;
 
         return {
@@ -147,20 +151,16 @@ export const addReview = mutation({
     const { tokenIdentifier, ...reviewData } = args;
     await ctx.db.insert("reviews", { ...reviewData, userId: user._id, isVerifiedPurchase: !!completedOrder, helpfulCount: 0, reportCount: 0 });
     
-    // After adding the review, recalculate the store's average rating
-    const allReviews = await ctx.db
-      .query("reviews")
-      .withIndex("by_store", (q) => q.eq("storeId", args.storeId))
-      .collect();
-
-    const totalReviews = allReviews.length;
-    const sumOfRatings = allReviews.reduce((sum, review) => sum + review.rating, 0);
-    const newAverageRating = totalReviews > 0 ? sumOfRatings / totalReviews : 0;
-
-    await ctx.db.patch(args.storeId, {
-      rating: newAverageRating,
-      totalReviews: totalReviews,
-    });
+    // OPTIMIZATION: Incrementally update store rating instead of fetching all reviews (O(1) vs O(N))
+    const store = await ctx.db.get(args.storeId);
+    if (store) {
+      const oldTotal = store.totalReviews || 0;
+      const oldRating = store.rating || 0;
+      const newTotal = oldTotal + 1;
+      // Formula: NewAvg = ((OldAvg * OldCount) + NewRating) / NewCount
+      const newRating = ((oldRating * oldTotal) + args.rating) / newTotal;
+      await ctx.db.patch(args.storeId, { rating: newRating, totalReviews: newTotal });
+    }
   },
 });
 
@@ -185,20 +185,15 @@ export const updateReview = mutation({
       comment: args.comment,
     });
 
-    // After updating the review, recalculate the store's average rating
-    const allReviews = await ctx.db
-      .query("reviews")
-      .withIndex("by_store", (q) => q.eq("storeId", review.storeId))
-      .collect();
-
-    const totalReviews = allReviews.length;
-    const sumOfRatings = allReviews.reduce((sum, review) => sum + review.rating, 0);
-    const newAverageRating = totalReviews > 0 ? sumOfRatings / totalReviews : 0;
-
-    await ctx.db.patch(review.storeId, {
-      rating: newAverageRating,
-      totalReviews: totalReviews,
-    });
+    // OPTIMIZATION: Incrementally update store rating
+    const store = await ctx.db.get(review.storeId);
+    if (store) {
+      const total = store.totalReviews || 1;
+      const oldRatingAvg = store.rating || 0;
+      // Formula: NewAvg = ((OldAvg * Count) - OldRating + NewRating) / Count
+      const newRating = ((oldRatingAvg * total) - review.rating + args.rating) / total;
+      await ctx.db.patch(review.storeId, { rating: newRating });
+    }
   },
 });
 
@@ -224,20 +219,17 @@ export const deleteReview = mutation({
 
     await ctx.db.delete(args.reviewId);
 
-    // After deleting the review, recalculate the store's average rating
-    const allReviews = await ctx.db
-      .query("reviews")
-      .withIndex("by_store", (q) => q.eq("storeId", storeId))
-      .collect();
-
-    const totalReviews = allReviews.length;
-    const sumOfRatings = allReviews.reduce((sum, review) => sum + review.rating, 0);
-    const newAverageRating = totalReviews > 0 ? sumOfRatings / totalReviews : 0;
-
-    await ctx.db.patch(storeId, {
-      rating: newAverageRating,
-      totalReviews: totalReviews,
-    });
+    // OPTIMIZATION: Incrementally update store rating
+    const store = await ctx.db.get(storeId);
+    if (store) {
+      const total = store.totalReviews || 1;
+      const oldRatingAvg = store.rating || 0;
+      const newTotal = Math.max(0, total - 1);
+      // Formula: NewAvg = ((OldAvg * Count) - OldRating) / (Count - 1)
+      const newRating = newTotal > 0 ? ((oldRatingAvg * total) - review.rating) / newTotal : 0;
+      
+      await ctx.db.patch(storeId, { rating: newRating, totalReviews: newTotal });
+    }
   },
 });
 

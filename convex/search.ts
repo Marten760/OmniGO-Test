@@ -22,7 +22,7 @@ export const globalSearch = query({
     const productsPromise = ctx.db
       .query("products")
       .withSearchIndex("search_all", (q) => q.search("name", args.query))
-      .take(10);
+      .take(50); // Fetch more candidates to allow for location filtering
 
     const [unprocessedStores, unprocessedProducts] = await Promise.all([
       storesPromise,
@@ -46,8 +46,14 @@ export const globalSearch = query({
     );
     const storesMap = new Map(productStores.filter(Boolean).map(s => [s!._id, s]));
 
+    // Filter products by location (must match user's country and region)
+    const filteredProducts = unprocessedProducts.filter(product => {
+      const store = storesMap.get(product.storeId);
+      return store && store.country === args.country && store.region === args.region;
+    }).slice(0, 10); // Take top 10 relevant results
+
     const products = await Promise.all(
-      unprocessedProducts.map(async (product) => {
+      filteredProducts.map(async (product) => {
         const store = storesMap.get(product.storeId);
         const [imageUrls, storeImageUrl] = await Promise.all([
           product.imageIds ? Promise.all(product.imageIds.map(id => ctx.storage.getUrl(id))) : [],
