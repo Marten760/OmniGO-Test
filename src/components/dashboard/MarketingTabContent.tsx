@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useMutation, useQuery, useAction } from 'convex/react';
+import { useMutation, useQuery, useAction, usePaginatedQuery } from 'convex/react';
 import { Mail, MessageSquare, Loader2, Users, Target, UserCheck, MoreVertical, Edit, Trash2, TriangleAlert, Percent, DollarSign, Image as ImageIcon, Upload, Camera } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -81,14 +81,16 @@ export function MarketingTabContent({ storeId }: MarketingTabContentProps) {
   const createPromotionMutation = useMutation(api.promotions.createOrUpdatePromotion);
   const updatePromotionMutation = useMutation(api.promotions.updatePromotion);
   const deletePromotionMutation = useMutation(api.promotions.deletePromotion);
-  const promotions = useQuery(
+  const { results: promotions, status: promoStatus, loadMore: loadMorePromos } = usePaginatedQuery(
     api.promotions.getPromotionsByStore,
-    { storeId }
+    { storeId },
+    { initialNumItems: 20 }
   );
   const generateUploadUrl = useMutation(api.stores.generateUploadUrl);  const sendCampaignAction = useAction(api.marketing.sendEmailCampaign);
-  const discounts = useQuery(
+  const { results: discounts, status: discountStatus, loadMore: loadMoreDiscounts } = usePaginatedQuery(
     api.marketing.getDiscountsByStore,
-    sessionToken ? { storeId, tokenIdentifier: sessionToken } : "skip"
+    sessionToken ? { storeId, tokenIdentifier: sessionToken } : "skip",
+    { initialNumItems: 20 }
   );
   const updateDiscountMutation = useMutation(api.marketing.updateDiscount);
 
@@ -556,6 +558,11 @@ export function MarketingTabContent({ storeId }: MarketingTabContentProps) {
                 })}
               </TableBody>
             </Table>
+            {discountStatus === "CanLoadMore" && (
+              <div className="flex justify-center py-4 border-t border-gray-800">
+                <Button variant="outline" onClick={() => loadMoreDiscounts(20)} className="text-gray-300 border-gray-700 hover:bg-gray-800">Load More Discounts</Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -669,6 +676,11 @@ export function MarketingTabContent({ storeId }: MarketingTabContentProps) {
                 </TableBody>
               </Table>
             </div>
+            {promoStatus === "CanLoadMore" && (
+              <div className="flex justify-center py-4 border-t border-gray-800">
+                <Button variant="outline" onClick={() => loadMorePromos(20)} className="text-gray-300 border-gray-700 hover:bg-gray-800">Load More Promotions</Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

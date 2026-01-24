@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useAction, useMutation, useConvex, useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner"; 
@@ -20,9 +20,8 @@ interface StoreRegistrationFormProps {
 
 export function StoreRegistrationForm({ onClose }: StoreRegistrationFormProps) {
   const regions = worldLocations;
-  const registerStore = useAction(api.stores.registerStore);
+  const registerStore = useMutation(api.stores.registerStore);
   const generateUploadUrl = useMutation(api.stores.generateUploadUrl);
-  const convex = useConvex();
 
   const sessionToken = useMemo(() => localStorage.getItem("sessionToken"), []);
   const user = useQuery(

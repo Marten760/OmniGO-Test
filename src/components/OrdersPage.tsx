@@ -1,4 +1,4 @@
-import { useQuery, useMutation} from "convex/react";
+import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useCart, type CartItem } from "../context/CartContext";
 import { Cart } from "./Cart";
@@ -47,13 +47,17 @@ function OrderCardSkeleton() {
   );
 }
 
-export function OrdersPage() {
+export function OrdersPage({ onNavigateToChat }: { onNavigateToChat?: (conversationId: Id<"conversations">) => void } = {}) {
   const [activeTab, setActiveTab] = useState<"current" | "history">("current");
   const { items, updateQuantity, removeItem, clearCart, getTotalItems, addItem } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const sessionToken = useMemo(() => localStorage.getItem("sessionToken"), []);
   const [reviewingOrder, setReviewingOrder] = useState<Doc<"orders"> | null>(null);
-  const orders = useQuery(api.orders.getOrdersByUser, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
+  const { results: orders, status: ordersStatus, loadMore: loadMoreOrders } = usePaginatedQuery(
+    api.orders.getOrdersByUser,
+    sessionToken ? { tokenIdentifier: sessionToken } : "skip",
+    { initialNumItems: 20 }
+  );
   
   const [processingOrders, setProcessingOrders] = useState<Set<string>>(new Set());
   const [reportingOrder, setReportingOrder] = useState<Doc<"orders"> | null>(null);
@@ -61,10 +65,14 @@ export function OrdersPage() {
   const createDisputeMutation = useMutation(api.orders.createDispute);
   const generateUploadUrl = useMutation(api.stores.generateUploadUrl);
   const [activeChatId, setActiveChatId] = useState<Id<"conversations"> | null>(null);
-  const getOrCreateConversation = useMutation(api.reports.getOrCreateReportConversation);
+  const findOrCreateChat = useMutation(api.chat.findOrCreateConversationForOrder);
 
   // Fetch all user reviews once to avoid N+1 queries inside the map.
-  const userReviews = useQuery(api.reviews.getUserReviews, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
+  const { results: userReviews } = usePaginatedQuery(
+    api.reviews.getUserReviews,
+    sessionToken ? { tokenIdentifier: sessionToken } : "skip",
+    { initialNumItems: 100 }
+  );
   const reviewedStoreIds = useMemo(() => {
     return new Set(userReviews?.map(review => review.storeId));
   }, [userReviews]);
@@ -217,8 +225,12 @@ export function OrdersPage() {
   const handleChat = async (orderId: Id<"orders">) => {
     if (!sessionToken) return;
     try {
-      const conversationId = await getOrCreateConversation({ tokenIdentifier: sessionToken, orderId });
-      setActiveChatId(conversationId);
+      const conversationId = await findOrCreateChat({ tokenIdentifier: sessionToken, orderId });
+      if (onNavigateToChat) {
+        onNavigateToChat(conversationId);
+      } else {
+        setActiveChatId(conversationId);
+      }
     } catch (error) {
       toast.error("Failed to open chat.");
     }
@@ -414,6 +426,18 @@ export function OrdersPage() {
                 orderHistory?.map((order) => <OrderCard key={order._id} order={order} />)
               )}
             </>
+          )}
+
+          {/* Load More Button */}
+          {ordersStatus === "CanLoadMore" && (
+            <div className="flex justify-center pt-6">
+              <button
+                onClick={() => loadMoreOrders(20)}
+                className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-full text-sm font-medium transition-colors border border-gray-700"
+              >
+                Load More Orders
+              </button>
+            </div>
           )}
         </div>
       </div>

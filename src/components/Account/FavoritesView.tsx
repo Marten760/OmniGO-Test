@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Doc, Id } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { ArrowLeft, Heart, Star, Store, Package, Loader2, ArrowRight } from "lucide-react";
 import { formatPiPrice } from "../../lib/utils";
+import { Button } from "../ui/button";
 
 type StoreWithUrl = Doc<"stores"> & { logoImageUrl: string | null; galleryImageUrl: string | null; };
 type ProductWithUrl = Doc<"products"> & { imageUrls: (string | null)[]; storeName: string; storeId: Id<"stores">; };
@@ -83,10 +84,19 @@ export function FavoritesView({ onBack, onStoreSelect, onProductSelect }: Favori
     const sessionToken = useMemo(() => localStorage.getItem("sessionToken"), []);
     const [activeTab, setActiveTab] = useState<'stores' | 'products'>('stores');
 
-    const favoriteStores = useQuery(api.storeFavorites.getFavoriteStores, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
-    const favoriteProducts = useQuery(api.favorites.getFavoriteProducts, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
+    const { results: favoriteStores, status: storesStatus, loadMore: loadMoreStores } = usePaginatedQuery(
+        api.storeFavorites.getFavoriteStores,
+        sessionToken ? { tokenIdentifier: sessionToken } : "skip",
+        { initialNumItems: 9 }
+    );
+    const { results: favoriteProducts, status: productsStatus, loadMore: loadMoreProducts } = usePaginatedQuery(
+        api.favorites.getFavoriteProducts,
+        sessionToken ? { tokenIdentifier: sessionToken } : "skip",
+        { initialNumItems: 9 }
+    );
 
-    const isLoading = favoriteStores === undefined || favoriteProducts === undefined;
+    const isLoading = (activeTab === 'stores' && storesStatus === 'LoadingFirstPage') || 
+                      (activeTab === 'products' && productsStatus === 'LoadingFirstPage');
 
     return (
         <div className="animate-fade-in">
@@ -120,9 +130,14 @@ export function FavoritesView({ onBack, onStoreSelect, onProductSelect }: Favori
                 <>
                     {activeTab === 'stores' && (
                         favoriteStores && favoriteStores.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {favoriteStores.map((store) => store && <FavoriteStoreCard key={store._id} store={store as StoreWithUrl} onSelect={onStoreSelect} />)}
-                            </div>
+                            <>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {favoriteStores.map((store) => store && <FavoriteStoreCard key={store._id} store={store as StoreWithUrl} onSelect={onStoreSelect} />)}
+                                </div>
+                                {storesStatus === "CanLoadMore" && (
+                                    <div className="mt-6 flex justify-center"><Button variant="outline" onClick={() => loadMoreStores(9)}>Load More Stores</Button></div>
+                                )}
+                            </>
                         ) : (
                             <div className="text-center py-16 bg-gray-800/50 border border-dashed border-gray-700 rounded-2xl">
                                 <Heart size={48} className="mx-auto text-gray-600 mb-4" />
@@ -134,9 +149,14 @@ export function FavoritesView({ onBack, onStoreSelect, onProductSelect }: Favori
 
                     {activeTab === 'products' && (
                         favoriteProducts && favoriteProducts.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {favoriteProducts.map((product) => product && <FavoriteProductCard key={product._id} product={product as ProductWithUrl} onSelect={onProductSelect} />)}
-                            </div>
+                            <>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {favoriteProducts.map((product) => product && <FavoriteProductCard key={product._id} product={product as ProductWithUrl} onSelect={onProductSelect} />)}
+                                </div>
+                                {productsStatus === "CanLoadMore" && (
+                                    <div className="mt-6 flex justify-center"><Button variant="outline" onClick={() => loadMoreProducts(9)}>Load More Products</Button></div>
+                                )}
+                            </>
                         ) : (
                             <div className="text-center py-16 bg-gray-800/50 border border-dashed border-gray-700 rounded-2xl">
                                 <Package size={48} className="mx-auto text-gray-600 mb-4" />

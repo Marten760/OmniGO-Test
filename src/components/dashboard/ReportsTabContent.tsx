@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, usePaginatedQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, AlertTriangle, MessageSquare } from 'lucide-react';
+import { Loader2, AlertTriangle, MessageSquare, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -20,17 +20,22 @@ import { formatPiPrice } from '../../lib/utils';
 
 export function ReportsTabContent({ storeId, onNavigateToChat }: { storeId: Id<"stores">, onNavigateToChat: (id: Id<"conversations">) => void }) {
   const { sessionToken } = useAuth();
-  const reports = useQuery(api.reports.getReportsByStore, sessionToken ? { tokenIdentifier: sessionToken, storeId } : "skip");
+  const { results: reports, status, loadMore } = usePaginatedQuery(
+    api.reports.getReportsByStore,
+    sessionToken ? { tokenIdentifier: sessionToken, storeId } : "skip",
+    { initialNumItems: 10 }
+  );
   const resolveReport = useMutation(api.reports.resolveReport);
-  const getOrCreateConversation = useMutation(api.reports.getOrCreateReportConversation);
+  const findOrCreateChat = useMutation(api.chat.findOrCreateConversationForOrder);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [resolutionNote, setResolutionNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
 
   const handleChat = async (orderId: Id<"orders">) => {
     if (!sessionToken) return;
     try {
-      const conversationId = await getOrCreateConversation({ tokenIdentifier: sessionToken, orderId });
+      const conversationId = await findOrCreateChat({ tokenIdentifier: sessionToken, orderId });
       onNavigateToChat(conversationId);
     } catch (error) {
       toast.error("Failed to open chat.");
@@ -104,21 +109,21 @@ export function ReportsTabContent({ storeId, onNavigateToChat }: { storeId: Id<"
                   {report.imageUrls.length > 0 && (
                     <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
                       {report.imageUrls.map((url: string, idx: number) => (
-                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                        <div key={idx} onClick={() => setZoomedImageUrl(url)} className="flex-shrink-0 cursor-pointer">
                           <img src={url} alt="Evidence" className="h-20 w-20 object-cover rounded-lg border border-gray-700 hover:opacity-80 transition-opacity" />
-                        </a>
+                        </div>
                       ))}
                     </div>
                   )}
 
                   {report.status === 'open' && (
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => handleChat(report.orderId)} className="gap-2">
+                    <div className="flex flex-col sm:flex-row justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleChat(report.orderId)} className="gap-2 w-full sm:w-auto">
                         <MessageSquare size={14} /> Chat with Customer
                       </Button>
                       <Dialog>
                         <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" onClick={() => setSelectedReport(report)}>Resolve Dispute</Button>
+                          <Button variant="outline" size="sm" onClick={() => setSelectedReport(report)} className="w-full sm:w-auto">Resolve Dispute</Button>
                         </DialogTrigger>
                         <DialogContent className="bg-gray-900 border-gray-700 text-white">
                           <DialogHeader>
@@ -167,10 +172,30 @@ export function ReportsTabContent({ storeId, onNavigateToChat }: { storeId: Id<"
                   )}
                 </div>
               ))}
+              {status === "CanLoadMore" && (
+                <div className="flex justify-center pt-4">
+                  <Button variant="outline" onClick={() => loadMore(10)}>Load More</Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {zoomedImageUrl && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] animate-fade-in flex items-center justify-center p-4" onClick={() => setZoomedImageUrl(null)}>
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={zoomedImageUrl} 
+              alt="Zoomed evidence" 
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+            <button onClick={() => setZoomedImageUrl(null)} className="absolute top-2 right-2 p-2 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors">
+              <X size={24} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

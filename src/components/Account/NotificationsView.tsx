@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCheck, Package, TicketPercent, Settings } from "lucide-react";
+import { ArrowLeft, CheckCheck, Package, TicketPercent, Settings, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Switch } from "../ui/switch";
+import { Button } from "../ui/button";
 
 const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
     <div className={`bg-gray-800 border border-gray-700 rounded-2xl ${className}`}>{children}</div>
@@ -77,7 +78,11 @@ function NotificationSettings({ onBack }: { onBack: () => void }) {
 
 export function NotificationsView({ onBack, defaultTab = "orders" }: { onBack: () => void, defaultTab?: "orders" | "promotions" }) {
     const sessionToken = useMemo(() => localStorage.getItem("sessionToken"), []);
-    const notifications = useQuery(api.notifications.getNotifications, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
+    const { results: notifications, status, loadMore } = usePaginatedQuery(
+        api.notifications.getNotifications,
+        sessionToken ? { tokenIdentifier: sessionToken } : "skip",
+        { initialNumItems: 20 }
+    );
     const markAllAsRead = useMutation(api.notifications.markAllAsRead);
 
     const handleMarkAllRead = () => {
@@ -132,6 +137,19 @@ export function NotificationsView({ onBack, defaultTab = "orders" }: { onBack: (
                     <NotificationList notifications={promotionNotifications} icon={TicketPercent} />
                 </TabsContent>
             </Tabs>
+
+            {status === "CanLoadMore" && (
+                <div className="flex justify-center py-4">
+                    <Button variant="outline" onClick={() => loadMore(10)} className="text-purple-400 border-purple-500/30 hover:bg-purple-500/10">
+                        Load More
+                    </Button>
+                </div>
+            )}
+            {status === "LoadingMore" && (
+                <div className="flex justify-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+                </div>
+            )}
         </div>
     );
 }

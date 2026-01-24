@@ -250,6 +250,15 @@ export function ChatsList({ onSelectConversation, setCurrentView }: ChatsListPro
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-center">
                 <h2 className="font-semibold truncate">{chat.otherUserName}</h2>
+                {chat.isDisputeConversation && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ml-2 ${
+                    chat.disputeStatus === 'open' ? 'bg-red-500/20 text-red-400' :
+                    chat.disputeStatus === 'resolved' ? 'bg-green-500/20 text-green-400' :
+                    'bg-gray-500/20 text-gray-400'
+                  }`}>
+                    {chat.disputeStatus === 'open' ? 'Dispute' : 'Dispute (Resolved)'}
+                  </span>
+                )}
                 <span className="text-xs text-gray-400">
                   {new Date(chat.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>

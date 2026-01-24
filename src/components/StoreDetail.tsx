@@ -1,4 +1,4 @@
-import { useQuery, useMutation} from "convex/react";
+import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ProductItemsList } from "./ProductItemsList";
 import { ReviewsList } from "./ReviewsList";
@@ -235,8 +235,28 @@ export function StoreDetail({ storeId, onBack, onNavigateToChat }: StoreDetailPr
     return { ...storeData, galleryImageUrls: storeData.galleryImageUrls || [] };
   }, [storeData]);
   
-  // 2. Fetch products.
-  const products = useQuery(api.products.getProductsByStore, { storeId: storeId });
+  // 2. Fetch products with pagination.
+  const { results: productResults, status: productStatus, loadMore: loadMoreProducts } = usePaginatedQuery(
+    api.products.getProductsByStore,
+    { storeId: storeId },
+    { initialNumItems: 5 }
+  );
+
+  const products = useMemo(() => {
+    if (!productResults) return undefined;
+    const grouped: Record<string, (Doc<"products"> & { imageUrls: (string | null)[] })[]> = {};
+    productResults.forEach((p: any) => {
+      if (!grouped[p.category]) grouped[p.category] = [];
+      grouped[p.category].push(p);
+    });
+    return grouped;
+  }, [productResults]);
+
+  const handleLoadMoreProducts = useCallback(() => {
+    if (productStatus === "CanLoadMore") {
+      loadMoreProducts(5);
+    }
+  }, [productStatus, loadMoreProducts]);
 
   // 3. Lazily fetch reviews only when the "reviews" tab is active.
   const reviews = useQuery(
@@ -303,6 +323,20 @@ export function StoreDetail({ storeId, onBack, onNavigateToChat }: StoreDetailPr
     elements.forEach(el => observer.observe(el!));
     return () => elements.forEach(el => observer.unobserve(el!));
   }, [products, activeTab]); // Rerun when products load or tab changes
+
+  // Infinite scroll observer for products
+  const productLoadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && productStatus === "CanLoadMore") {
+        loadMoreProducts(5);
+      }
+    });
+    if (productLoadMoreRef.current) {
+      observer.observe(productLoadMoreRef.current);
+    }
+    return () => observer.disconnect();
+  }, [productStatus, loadMoreProducts]);
 
   if (store === undefined) {
     return <StoreDetailSkeleton />;
@@ -555,6 +589,11 @@ export function StoreDetail({ storeId, onBack, onNavigateToChat }: StoreDetailPr
                       onCategorySelect={(category) => setActiveCategory(category)}
                     />
                     <ProductItemsList products={products} store={store} onProductItemSelect={setSelectedProductItem} />
+                    {productStatus === "CanLoadMore" && (
+                      <div ref={productLoadMoreRef} className="flex justify-center py-8">
+                        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+                      </div>
+                    )}
                   </>
                 )}
               </>

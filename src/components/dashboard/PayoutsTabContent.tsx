@@ -1,4 +1,4 @@
-import { useQuery, useAction, useMutation } from 'convex/react';
+import { useQuery, useAction, useMutation, usePaginatedQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useAuth } from '../../hooks/useAuth';
 import { usePi } from '../../hooks/usePi';
@@ -7,6 +7,7 @@ import { AlertCircle, CheckCircle2, ExternalLink, Loader2, RefreshCw } from 'luc
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Button } from '../ui/button';
 
 interface PayoutsTabContentProps {
   storeId: Id<'stores'>;
@@ -15,9 +16,10 @@ interface PayoutsTabContentProps {
 export function PayoutsTabContent({ storeId }: PayoutsTabContentProps) {
   const { sessionToken, user } = useAuth();
   const { authenticate } = usePi();
-    const payouts = useQuery(
+  const { results: payouts, status, loadMore } = usePaginatedQuery(
     api.payouts.getPayoutsByStore, 
-    sessionToken ? { storeId, tokenIdentifier: sessionToken } : 'skip'
+    sessionToken ? { storeId, tokenIdentifier: sessionToken } : 'skip',
+    { initialNumItems: 20 }
   );
   const retryPayout = useAction(api.paymentsActions.retryFailedPayout);
 
@@ -137,6 +139,11 @@ export function PayoutsTabContent({ storeId }: PayoutsTabContentProps) {
             </tbody>
           </table>
         </div>
+        {status === "CanLoadMore" && (
+          <div className="flex justify-center py-4 border-t border-gray-800">
+            <Button variant="outline" onClick={() => loadMore(20)} className="text-gray-300 border-gray-700 hover:bg-gray-800">Load More Payouts</Button>
+          </div>
+        )}
       </div>
     </div>
   );

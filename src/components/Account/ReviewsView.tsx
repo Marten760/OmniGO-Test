@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, usePaginatedQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner";
-import { ArrowLeft, Star, Edit, Trash2, Flag, MessageSquare } from "lucide-react";
+import { ArrowLeft, Star, Edit, Trash2, Flag, MessageSquare, Loader2 } from "lucide-react";
 
 const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
     <div className={`bg-gray-800 border border-gray-700 rounded-2xl ${className}`}>{children}</div>
@@ -62,7 +62,11 @@ function EditReviewForm({ review, onSave, onCancel }: { review: any, onSave: (re
 
 export function ReviewsView({ onBack }: { onBack: () => void }) {
     const sessionToken = useMemo(() => localStorage.getItem("sessionToken"), []);
-    const reviews = useQuery(api.reviews.getUserReviews, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
+    const { results: reviews, status, loadMore } = usePaginatedQuery(
+        api.reviews.getUserReviews,
+        sessionToken ? { tokenIdentifier: sessionToken } : "skip",
+        { initialNumItems: 10 }
+    );
     const [editingReview, setEditingReview] = useState<any | null>(null);
     const deleteReview = useMutation(api.reviews.deleteReview);
     const updateReview = useMutation(api.reviews.updateReview);
@@ -161,6 +165,18 @@ export function ReviewsView({ onBack }: { onBack: () => void }) {
                             </Card>
                         )
                     ))}
+                    {status === "CanLoadMore" && (
+                        <div className="flex justify-center py-4">
+                            <Button onClick={() => loadMore(10)} className="px-4 py-2 border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors">
+                                Load More
+                            </Button>
+                        </div>
+                    )}
+                    {status === "LoadingMore" && (
+                        <div className="flex justify-center py-4">
+                            <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+                        </div>
+                    )}
                 </div>
             )}
         </div>

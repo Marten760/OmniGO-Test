@@ -1,10 +1,8 @@
 import { Id, Doc } from "../../convex/_generated/dataModel";
 import { LocationSelector } from "./LocationSelector";
 import { SearchBar } from "./SearchBar";
-import { useState } from "react";
 import { FilterBar } from "./FilterBar";
 import { StoreList } from "./StoreList";
-import { ProductItemDetailModal } from "./ProductItemDetailModal";
 import { useDebounce } from "../hooks/useDebounce";
 
 interface HomePageProps {

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, usePaginatedQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id, Doc } from '../../../convex/_generated/dataModel';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -23,11 +23,12 @@ interface InventoryTabContentProps {
 
 export function InventoryTabContent({ storeId, storeType }: InventoryTabContentProps) {
   const sessionToken = useMemo(() => localStorage.getItem("sessionToken"), []);
-  const inventoryDetails = useQuery(
+  const { results: inventoryItems, status, loadMore } = usePaginatedQuery(
     api.inventory.getInventoryDetails,
-    sessionToken ? { storeId, tokenIdentifier: sessionToken } : "skip"
+    sessionToken ? { storeId, tokenIdentifier: sessionToken } : "skip",
+    { initialNumItems: 50 }
   );
-  const [localItems, setLocalItems] = useState(inventoryDetails?.items ?? []);
+  const [localItems, setLocalItems] = useState(inventoryItems ?? []);
   const updateAvailability = useMutation(api.inventory.updateProductAvailability);
   const setQuantityMutation = useMutation(api.inventory.setProductQuantity);
 
@@ -39,10 +40,10 @@ export function InventoryTabContent({ storeId, storeType }: InventoryTabContentP
 
   // Sync local state when remote data changes
   useEffect(() => {
-    if (inventoryDetails?.items) {
-      setLocalItems(inventoryDetails.items);
+    if (inventoryItems) {
+      setLocalItems(inventoryItems);
     }
-  }, [inventoryDetails]);
+  }, [inventoryItems]);
 
   // Effect to call the mutation when the debounced value changes
   useEffect(() => {
@@ -101,19 +102,18 @@ export function InventoryTabContent({ storeId, storeType }: InventoryTabContentP
     }
   }, [storeType]);
 
-  if (inventoryDetails === undefined) {
+  if (inventoryItems === undefined) {
     return <InventoryTabSkeleton />;
   }
 
-  if (!inventoryDetails) {
-    return (
-      <div className="flex items-center justify-center h-64 rounded-lg border border-dashed">
-        <p className="text-muted-foreground">No inventory data available.</p>
-      </div>
-    );
-  }
-
-  const { summary } = inventoryDetails;
+  // Calculate summary on frontend based on loaded items
+  const summary = {
+    totalItems: localItems.length,
+    availableItems: localItems.filter(i => i.isAvailable).length,
+    unavailableItems: localItems.filter(i => !i.isAvailable).length,
+  };
+  // Note: This summary is based on *loaded* items. For a complete store summary, 
+  // a separate backend query returning just stats would be ideal in the future.
 
   return (
     <div className="space-y-6">
@@ -273,6 +273,11 @@ export function InventoryTabContent({ storeId, storeType }: InventoryTabContentP
               )}
             </TableBody>
           </Table>
+          {status === "CanLoadMore" && (
+            <div className="flex justify-center py-4 border-t border-gray-800">
+              <Button variant="outline" onClick={() => loadMore(50)} className="text-gray-300 border-gray-700 hover:bg-gray-800">Load More Items</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

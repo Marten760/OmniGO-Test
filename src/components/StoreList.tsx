@@ -1,10 +1,11 @@
-import { useQuery } from "convex/react";
+import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { StoreCard } from "./StoreCard";
 import { PromotionsCarousel } from "./PromotionsCarousel";
 import { ProductCarouselCard } from "./ProductCarouselCard"; // New import
 import { TrendingUp, Award, MapPin, Loader2 } from "lucide-react";
 import { Id, Doc } from "../../convex/_generated/dataModel";
+import { useEffect, useState, useRef } from "react";
 
 interface StoreListProps {
   country: string;
@@ -44,9 +45,10 @@ export function StoreList({
   onStoreSelect,
   onProductSelect, // Destructure new prop
 }: StoreListProps) {
+  const [productLimit, setProductLimit] = useState(5);
   // New query for diverse products (assuming api.products.getDiverseProducts exists and returns product with store details)
   const diverseProducts = useQuery(api.products.getDiverseProducts, {
-    limit: 10,
+    limit: productLimit,
     storeType: filters.storeType,
     categories: filters.cuisine,
     country: country,
@@ -60,7 +62,7 @@ export function StoreList({
   );
 
   // Fetch stores only if there is no search term
-  const stores = useQuery(
+  const { results: stores, status: storeStatus, loadMore: loadMoreStores } = usePaginatedQuery(
     api.stores.getStores,
     searchTerm
       ? "skip"
@@ -73,8 +75,37 @@ export function StoreList({
         hasDelivery: filters.hasDelivery,
         sortBy: filters.sortBy,
         rating: filters.rating,
-      }
+      },
+    { initialNumItems: 5 }
   );
+
+  const storeLoadMoreRef = useRef<HTMLDivElement>(null);
+  const productLoadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && storeStatus === "CanLoadMore") {
+        loadMoreStores(5);
+      }
+    });
+
+    if (storeLoadMoreRef.current) {
+      observer.observe(storeLoadMoreRef.current);
+    }
+    return () => observer.disconnect();
+  }, [storeStatus, loadMoreStores]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setProductLimit(prev => prev + 5);
+      }
+    });
+    if (productLoadMoreRef.current) {
+      observer.observe(productLoadMoreRef.current);
+    }
+    return () => observer.disconnect();
+  }, []);
 
   const hasActiveFilters =
     filters.cuisine.length > 0 ||
@@ -180,6 +211,7 @@ export function StoreList({
                       onStoreSelect={onStoreSelect}
                     />
                   ))}
+                  <div ref={productLoadMoreRef} className="w-1 flex-shrink-0" />
               </div>
             </div>
           )}
@@ -206,6 +238,11 @@ export function StoreList({
                 <StoreCard key={store._id} store={store} onSelect={onStoreSelect} />
               ))}
             </div>
+            {storeStatus === "CanLoadMore" && (
+               <div ref={storeLoadMoreRef} className="flex justify-center py-4">
+                 <Loader2 className="w-6 h-6 animate-spin text-purple-400" />
+               </div>
+            )}
           </div>
         </>
       )}
