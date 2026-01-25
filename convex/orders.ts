@@ -100,6 +100,7 @@ export const getRecentOrdersByStore = query({
             [customerProfile?.firstName, customerProfile?.lastName].filter(Boolean).join(' ') ||
             customerProfile?.piUsername ||
             "Anonymous User",
+          customerPhone: customerProfile?.phone,
           deliveryAddress: order.deliveryAddress
         };
       })
