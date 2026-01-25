@@ -272,21 +272,21 @@ export function StoreManager({ store, onBack, onLogout, navigate, onNavigateToCh
         <StatCard
           title="Revenue"
           value={formatPiPrice(stats.revenue)}
-          description="+20.1% from last month"
+          description=""
           icon={<DollarSign className="h-4 w-4 text-purple-400" />}
           gradient="from-purple-600/20 to-black/10"
         />
         <StatCard
           title="Orders"
           value={`${stats.orders}`}
-          description="+12% from last week"
+          description=""
           icon={<Package className="h-4 w-4 text-blue-400" />}
           gradient="from-blue-500/20 to-black/10"
         />
         <StatCard
           title="Customers"
           value={`${stats.customers}`}
-          description="+8 new this week"
+          description=""
           icon={<Users className="h-4 w-4 text-green-400" />}
           gradient="from-green-500/20 to-black/10"
         />
