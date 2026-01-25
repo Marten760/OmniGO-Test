@@ -4,7 +4,7 @@ import { api } from '../../../convex/_generated/api';
 import { Doc, Id } from '../../../convex/_generated/dataModel';
 import { useAuth } from '../../hooks/useAuth';
 import { toast } from 'sonner';
-import { Loader2, User, Check, X, UserX, UserCheck, Briefcase, UserPlus, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Loader2, User, Check, X, UserX, UserCheck, Briefcase, UserPlus, MessageSquare, AlertTriangle, Phone } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
@@ -59,6 +59,12 @@ function DriverCard({ driver, onManage, onStartChat, isLoading }: DriverCardProp
         <div>
           <p className="font-semibold text-white">{fullName}</p>
           <p className="text-sm text-gray-400">{profile?.piUsername ? `@${profile.piUsername}` : 'No Pi username'}</p>
+          {profile?.phone && (
+            <div className="flex items-center gap-1 text-sm text-gray-400 mt-1">
+              <Phone className="h-3 w-3" />
+              <a href={`tel:${profile.phone}`} className="hover:text-purple-400 transition-colors">{profile.phone}</a>
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">

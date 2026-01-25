@@ -17,7 +17,7 @@ import {
 } from "../ui/dialog";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Label } from "../ui/label";
-import { Loader2, User, Truck, TicketPercent, MapPin, Package, MessageSquare, Search } from 'lucide-react';
+import { Loader2, User, Truck, TicketPercent, MapPin, Package, MessageSquare, Search, Phone } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { NavigateFunction } from 'react-router-dom';
 import { Input } from '../ui/input';
@@ -58,7 +58,7 @@ function OrderCard({
   onStartChat,
   isActionable,
 }: {
-  order: Doc<"orders"> & { customerName: string };
+  order: Doc<"orders"> & { customerName: string; customerPhone?: string };
   onUpdateStatus: (orderId: Id<"orders">, currentStatus: Doc<"orders">["status"]) => void;
   getNextActionText: (status: Doc<"orders">["status"]) => string;
   isActionable: (status: Doc<"orders">["status"]) => boolean;
@@ -75,6 +75,12 @@ function OrderCard({
                 <User className="h-4 w-4 text-gray-400" />
                 <p className="font-semibold text-lg text-white">{order.customerName}</p>
               </div>
+              {order.customerPhone && (
+                <div className="flex items-center gap-2 mb-1 text-sm text-gray-400">
+                  <Phone className="h-3 w-3" />
+                  <a href={`tel:${order.customerPhone}`} className="hover:text-purple-400 transition-colors">{order.customerPhone}</a>
+                </div>
+              )}
               <p className="text-xs text-gray-500 font-mono ml-6">Order #{order._id.slice(-6).toUpperCase()}</p>
             </div>
             <div className="sm:hidden flex items-center gap-1">
