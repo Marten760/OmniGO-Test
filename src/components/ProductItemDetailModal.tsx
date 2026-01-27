@@ -112,7 +112,7 @@ export function ProductItemDetailModal({ item, isOpen, onClose, onStoreSelect }:
 
   const availableStock = useMemo(() => {
     // If the store is a restaurant, stock is effectively infinite.
-    if (item.storeName.toLowerCase().includes('pizza') || item.storeName.toLowerCase().includes('restaurant')) {
+    if (store?.storeType === 'restaurant') {
       return Infinity;
     }
 
@@ -303,14 +303,15 @@ export function ProductItemDetailModal({ item, isOpen, onClose, onStoreSelect }:
               <h3 className="text-lg font-semibold text-white mb-3">{option.title}</h3>
               <div className="space-y-3">
                 {option.choices.map(choice => {
-                  const isChoiceOutOfStock = choice.quantity !== undefined && choice.quantity <= 0;
+                  const isRestaurant = store?.storeType === 'restaurant';
+                  const isChoiceOutOfStock = !isRestaurant && choice.quantity !== undefined && choice.quantity <= 0;
                   return (
                   <label key={choice.name} className={`flex items-center justify-between bg-gray-800 p-4 rounded-xl border-2 transition-all ${isChoiceOutOfStock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer border-transparent has-[:checked]:border-purple-500 has-[:checked]:bg-purple-600/20'}`}>
                     <div className="flex flex-col">
                       <span className={`font-medium ${isChoiceOutOfStock ? 'text-gray-500' : 'text-white'}`}>{choice.name}</span>
                       <div className="flex items-center gap-2">
                         {choice.price_increment > 0 && <span className="text-sm text-gray-400">(+{formatPiPrice(choice.price_increment)})</span>}
-                        {choice.quantity !== undefined && (
+                        {!isRestaurant && choice.quantity !== undefined && (
                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
                             choice.quantity <= 0 ? 'bg-red-500/20 text-red-400 border-red-500/30' :
                             choice.quantity <= 5 ? 'bg-red-500/20 text-red-400 border-red-500/30' :

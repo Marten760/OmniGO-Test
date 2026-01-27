@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Bell, CheckCheck, ShoppingCart, Truck, Megaphone } from 'lucide-react';
+import { Bell, CheckCheck, ShoppingCart, Truck, Megaphone, Briefcase, AlertTriangle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,10 @@ export function NotificationBell({ setCurrentView }: NotificationBellProps) {
         return <Truck className="h-4 w-4 text-blue-400" />;
       case "promotion":
         return <Megaphone className="h-4 w-4 text-yellow-400" />;
+      case "driver_application":
+        return <Briefcase className="h-4 w-4 text-green-400" />;
+      case "report":
+        return <AlertTriangle className="h-4 w-4 text-red-400" />;
       default:
         return <Bell className="h-4 w-4 text-gray-400" />;
     }
@@ -59,6 +63,10 @@ export function NotificationBell({ setCurrentView }: NotificationBellProps) {
         setCurrentView('dashboard');
       } else if (notification.type === 'promotion') {
         setCurrentView('account_promotions');
+      } else if (notification.type === 'driver_application') {
+        setCurrentView('dashboard');
+      } else if (notification.type === 'report') {
+        setCurrentView('dashboard');
       } else {
         setCurrentView('account');
         // You might want a sub-view for notifications in the account page later

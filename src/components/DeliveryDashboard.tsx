@@ -7,7 +7,7 @@ import { useNavigate, NavigateFunction } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader2, Truck, Check, MapPin, Phone, MessageSquare } from 'lucide-react';
 import { formatPiPrice } from '../lib/utils';
-function DeliveryOrderCard({ order, onNavigateToChat }: { order: Doc<"orders">, onNavigateToChat: (conversationId: Id<"conversations">) => void }) {
+function DeliveryOrderCard({ order, onNavigateToChat }: { order: Doc<"orders"> & { customerPhone?: string }, onNavigateToChat: (conversationId: Id<"conversations">) => void }) {
   const { sessionToken } = useAuth();
   const updateStatus = useMutation(api.orders.updateOrderStatus);
 
@@ -52,6 +52,12 @@ function DeliveryOrderCard({ order, onNavigateToChat }: { order: Doc<"orders">, 
         <div>
           <h3 className="text-xl font-bold text-white">{order.customerName}</h3>
           <p className="text-sm text-gray-400">Order #{order._id.slice(-6).toUpperCase()}</p>
+          {order.customerPhone && (
+            <div className="flex items-center gap-2 mt-1 text-sm text-gray-400">
+              <Phone className="h-3 w-3" />
+              <a href={`tel:${order.customerPhone}`} className="hover:text-purple-400 transition-colors">{order.customerPhone}</a>
+            </div>
+          )}
         </div>
         <div className="text-lg font-bold text-purple-400 font-mono">
           {formatPiPrice(order.totalAmount)}

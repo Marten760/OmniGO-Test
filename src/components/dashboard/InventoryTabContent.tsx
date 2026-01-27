@@ -207,7 +207,7 @@ export function InventoryTabContent({ storeId, storeType }: InventoryTabContentP
                     <TableCell className="font-medium text-gray-100 truncate">{item.name}</TableCell>
                     <TableCell className="text-gray-400">{item.category}</TableCell>
                     <TableCell>
-                      {storeType !== 'restaurant' && item.options && item.options.length > 0 ? (
+                      {item.options && item.options.length > 0 ? (
                         <div className="flex flex-wrap items-center gap-1.5">
                           {(() => {
                             const allChoices = item.options.flatMap(opt => opt.choices);
@@ -218,7 +218,10 @@ export function InventoryTabContent({ storeId, storeType }: InventoryTabContentP
                               <>
                                 {displayChoices.map((choice, idx) => (
                                   <Badge key={idx} variant="outline" className="text-xs font-normal border-gray-700 bg-gray-800 text-gray-300">
-                                    {choice.name}: <span className="font-mono ml-1.5 text-purple-300">{choice.quantity ?? 'N/A'}</span>
+                                    {choice.name}
+                                    {storeType !== 'restaurant' && (
+                                      <>: <span className="font-mono ml-1.5 text-purple-300">{choice.quantity ?? 'N/A'}</span></>
+                                    )}
                                   </Badge>
                                 ))}
                                 {hasMore && <Badge variant="outline" className="text-xs font-normal border-gray-700 bg-gray-800 text-gray-400">...</Badge>}
