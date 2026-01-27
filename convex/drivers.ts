@@ -32,6 +32,25 @@ export const applyToBeDriver = mutation({
       status: "pending",
     });
 
+    // Notify store owner
+    const store = await ctx.db.get(args.storeId);
+    if (store && store.ownerId) {
+      const owner = await ctx.db
+        .query("users")
+        .withIndex("by_tokenIdentifier", (q) => q.eq("tokenIdentifier", store.ownerId))
+        .unique();
+      
+      if (owner) {
+        await ctx.db.insert("notifications", {
+          userId: owner._id,
+          storeId: args.storeId,
+          message: `New driver application from ${user.name || "a user"}.`,
+          isRead: false,
+          type: "driver_application",
+        });
+      }
+    }
+
     return { success: true };
   },
 });

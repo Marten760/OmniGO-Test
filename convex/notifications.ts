@@ -96,7 +96,13 @@ export const create = internalMutation({
     storeId: v.optional(v.id("stores")),
     orderId: v.optional(v.id("orders")),
     message: v.string(),
-    type: v.union(v.literal("new_order"), v.literal("status_update"), v.literal("promotion")),
+    type: v.union(
+      v.literal("new_order"),
+      v.literal("status_update"),
+      v.literal("promotion"),
+      v.literal("driver_application"),
+      v.literal("report")
+    ),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("notifications", {

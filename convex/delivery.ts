@@ -47,9 +47,23 @@ export const getAssignedOrders = query({
     // Sort in memory (newest first)
     assignedOrders.sort((a, b) => b._creationTime - a._creationTime);
 
+    // Fetch customer profiles to get phone numbers
+    const ordersWithDetails = await Promise.all(
+      assignedOrders.map(async (order) => {
+        const profile = await ctx.db
+          .query("userProfiles")
+          .withIndex("by_user", (q) => q.eq("userId", order.userId))
+          .unique();
+        return {
+          ...order,
+          customerPhone: profile?.phone,
+        };
+      })
+    );
+
     return {
         assignedStores: assignedStores.filter(Boolean), // Filter out nulls if a store was deleted
-        orders: assignedOrders,
+        orders: ordersWithDetails,
     };
   },
 });

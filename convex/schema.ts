@@ -291,7 +291,13 @@ const applicationTables = {
     storeId: v.optional(v.id("stores")),
     message: v.string(),
     isRead: v.boolean(),
-    type: v.union(v.literal("new_order"), v.literal("status_update"), v.literal("promotion")),
+    type: v.union(
+      v.literal("new_order"),
+      v.literal("status_update"),
+      v.literal("promotion"),
+      v.literal("driver_application"),
+      v.literal("report")
+    ),
   })
     .index("by_user", ["userId"])
     .index("by_user_read_status", ["userId", "isRead"]),

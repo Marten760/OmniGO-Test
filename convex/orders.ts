@@ -453,6 +453,26 @@ export const createDispute = mutation({
       status: 'open',
     });
 
+    // Notify store owner
+    const store = await ctx.db.get(order.storeId);
+    if (store && store.ownerId) {
+      const owner = await ctx.db
+        .query("users")
+        .withIndex("by_tokenIdentifier", (q) => q.eq("tokenIdentifier", store.ownerId))
+        .unique();
+      
+      if (owner) {
+        await ctx.db.insert("notifications", {
+          userId: owner._id,
+          storeId: order.storeId,
+          orderId: args.orderId,
+          message: `New dispute reported for order #${args.orderId.slice(-6)}.`,
+          isRead: false,
+          type: "report",
+        });
+      }
+    }
+
     return { success: true };
   },
 });
