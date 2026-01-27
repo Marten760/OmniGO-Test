@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { storeTypes, storeCategories } from "../../data/storeCategories";
 import { OpeningHoursInput, DayHours } from './OpeningHoursInput';
 import { Switch } from "../ui/switch";
+import { compressImage } from "../../lib/imageUtils";
 
 interface StoreRegistrationFormProps {
   onClose: () => void;
@@ -126,11 +127,13 @@ export function StoreRegistrationForm({ onClose }: StoreRegistrationFormProps) {
     if (!user?.tokenIdentifier) {
       throw new Error("Authentication error: No session token found.");
     }
+    const compressedFile = await compressImage(file, { maxWidth: 1024, quality: 0.85 });
+
     const uploadUrl = await generateUploadUrl();
     const result = await fetch(uploadUrl, {
       method: "POST",
-      headers: { "Content-Type": file.type },
-      body: file,
+      headers: { "Content-Type": compressedFile.type },
+      body: compressedFile,
     });
     if (!result.ok) {
       throw new Error("Failed to upload image");

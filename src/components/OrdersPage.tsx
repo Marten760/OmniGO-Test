@@ -11,6 +11,7 @@ import { Doc, Id } from "../../convex/_generated/dataModel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { ChatScreen } from "./chat/ChatScreen";
+import { compressImage } from "../lib/imageUtils";
 
 function OrderCardSkeleton() {
   return (
@@ -520,7 +521,12 @@ function ReportForm({ orderId, onClose, sessionToken, createDispute, generateUpl
     if (onSubmitStart) onSubmitStart();
     try {
       // Upload images
-      const imageIds = await Promise.all(images.map(async (file) => {
+      const compressionPromises = images.map(image => 
+        compressImage(image, { maxWidth: 1024, quality: 0.8 })
+      );
+      const compressedImages = await Promise.all(compressionPromises);
+
+      const imageIds = await Promise.all(compressedImages.map(async (file) => {
         const url = await generateUploadUrl();
         const result = await fetch(url, {
           method: "POST",

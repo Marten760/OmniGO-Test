@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { Star, Upload, X } from "lucide-react";
+import { compressImage } from "../lib/imageUtils";
 
 interface AddReviewProps {
   storeId: Id<"stores">;
@@ -46,8 +47,13 @@ export function AddReview({ storeId }: AddReviewProps) {
     setIsSubmitting(true);
     
     try {
+      const compressionPromises = images.map(image => 
+        compressImage(image, { maxWidth: 1024, quality: 0.8 })
+      );
+      const compressedImages = await Promise.all(compressionPromises);
+
       const uploadedImageIds = await Promise.all(
-        images.map(async (image) => {
+        compressedImages.map(async (image) => {
           const uploadUrl = await generateUploadUrl();
           const result = await fetch(uploadUrl, {
             method: "POST",

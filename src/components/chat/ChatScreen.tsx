@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
+import { compressImage } from "../../lib/imageUtils";
 
 interface ChatScreenProps {
   conversationId: Id<"conversations">;
@@ -146,7 +147,12 @@ export function ChatScreen({ conversationId, onBack }: ChatScreenProps) {
         await editMessageMutation({ tokenIdentifier: sessionToken, messageId: editingMessage._id, newText: text });
       } else if (tempImageFiles.length > 0) {
         // 1. Upload all images in parallel
-        const imageIds = await Promise.all(tempImageFiles.map(async (file) => {
+        const compressionPromises = tempImageFiles.map(file => 
+          compressImage(file, { maxWidth: 1024, quality: 0.8 })
+        );
+        const compressedFiles = await Promise.all(compressionPromises);
+
+        const imageIds = await Promise.all(compressedFiles.map(async (file) => {
           const uploadUrl = await generateUploadUrl();
           const result = await fetch(uploadUrl, {
             method: "POST",

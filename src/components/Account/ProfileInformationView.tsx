@@ -3,6 +3,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Pi, User } from "lucide-react";
+import { compressImage } from "../../lib/imageUtils";
 
 const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
     <div className={`bg-gray-800 border border-gray-700 rounded-2xl ${className}`}>{children}</div>
@@ -143,11 +144,12 @@ export function ProfileInformationView({ user, onBack }: { user: any, onBack: ()
                             const promise = (async () => {
                                 let profileImageId = user?.profile?.profileImageId;
                                 if (profileImage) {
+                                    const compressedFile = await compressImage(profileImage, { maxWidth: 512, quality: 0.8 });
                                     const uploadUrl = await generateUploadUrl();
                                     const result = await fetch(uploadUrl, {
                                         method: "POST",
-                                        headers: { "Content-Type": profileImage.type },
-                                        body: profileImage,
+                                        headers: { "Content-Type": compressedFile.type },
+                                        body: compressedFile,
                                     });
                                     const { storageId } = await result.json();
                                     profileImageId = storageId;

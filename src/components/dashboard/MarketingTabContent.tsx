@@ -37,6 +37,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../../hooks/useAuth';
 import { EditPromotionForm } from './EditPromotionForm';
 import { EditDiscountForm } from './EditDiscountForm';
+import { compressImage } from '../../lib/imageUtils';
 
 interface MarketingTabContentProps {
   storeId: Id<'stores'>;
@@ -241,11 +242,12 @@ export function MarketingTabContent({ storeId }: MarketingTabContentProps) {
     setIsCreatingPromotion(true);
     try {
       // 1. Upload image
+      const compressedFile = await compressImage(promotion.image, { maxWidth: 1280, quality: 0.8 });
       const uploadUrl = await generateUploadUrl();
       const result = await fetch(uploadUrl, {
         method: "POST",
-        headers: { "Content-Type": promotion.image.type },
-        body: promotion.image,
+        headers: { "Content-Type": compressedFile.type },
+        body: compressedFile,
       });
       const { storageId } = await result.json();
 

@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Image as ImageIcon, Upload } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { compressImage } from "../../lib/imageUtils";
 
 interface EditPromotionFormProps {
   promotion: Doc<"promotions"> & { imageUrl?: string | null };
@@ -68,11 +69,12 @@ export function EditPromotionForm({ promotion, onBack }: EditPromotionFormProps)
       let imageIdToUpdate = promotion.imageId;
 
       if (newImage) {
+        const compressedFile = await compressImage(newImage, { maxWidth: 1280, quality: 0.8 });
         const uploadUrl = await generateUploadUrl();
         const result = await fetch(uploadUrl, {
           method: "POST",
-          headers: { "Content-Type": newImage.type },
-          body: newImage,
+          headers: { "Content-Type": compressedFile.type },
+          body: compressedFile,
         });
         const { storageId } = await result.json();
         imageIdToUpdate = storageId;

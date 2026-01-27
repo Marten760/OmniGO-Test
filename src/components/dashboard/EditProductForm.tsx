@@ -5,6 +5,7 @@ import { Doc, Id } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { Upload, Camera, ArrowLeft, Plus, Trash2, Settings, Check, X, Edit, Loader2 } from "lucide-react";
 import { Reorder } from "framer-motion";
+import { compressImage } from "../../lib/imageUtils";
 
 type ProductWithUrl = NonNullable<ReturnType<typeof useQuery<typeof api.products.getStoreProductsFlat>>>[number] & { imageUrls: string[] };
 
@@ -201,7 +202,12 @@ export function EditProductForm({ product, storeType, onBack, storeId }: EditPro
     if (!sessionToken) {
       throw new Error("Authentication error: No session token found.");
     }
-    const uploadPromises = files.map(async (file) => {
+    const compressionPromises = files.map(file => 
+      compressImage(file, { maxWidth: 1024, quality: 0.85 })
+    );
+    const compressedFiles = await Promise.all(compressionPromises);
+
+    const uploadPromises = compressedFiles.map(async (file) => {
       const uploadUrl = await generateUploadUrl();
       const result = await fetch(uploadUrl, {
         method: "POST",

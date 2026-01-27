@@ -5,6 +5,7 @@ import { Doc, Id } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { Upload, Camera, ArrowLeft, Plus, Trash2, Edit, Check, X, Loader2, Settings } from "lucide-react";
 import { Reorder } from "framer-motion";
+import { compressImage } from "../../lib/imageUtils";
 
 interface AddProductFormProps {
   storeId: Id<"stores">;
@@ -118,7 +119,12 @@ export function AddProductForm({ storeId, storeType, onBack }: AddProductFormPro
     if (!sessionToken) {
       throw new Error("Authentication error: No session token found.");
     }
-    const uploadPromises = files.map(async (file) => {
+    const compressionPromises = files.map(file => 
+      compressImage(file, { maxWidth: 1024, quality: 0.85 })
+    );
+    const compressedFiles = await Promise.all(compressionPromises);
+
+    const uploadPromises = compressedFiles.map(async (file) => {
       const uploadUrl = await generateUploadUrl();
       const result = await fetch(uploadUrl, {
         method: "POST",
