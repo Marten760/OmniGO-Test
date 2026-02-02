@@ -224,12 +224,19 @@ export const approvePiPayment = action({
         headers: { 'Authorization': `Key ${piApiKey}` },
       });
 
+      const responseBody = await approveResponse.json();
+
       if (!approveResponse.ok) {
-        const errorBody = await approveResponse.text();
-        throw new Error(`Failed to approve Pi payment: ${errorBody}`);
+        // FIX: Handle "already_approved" error gracefully.
+        // If the payment is already approved, we should proceed as success.
+        if (responseBody.error === "already_approved" && responseBody.payment) {
+          console.log(`[approvePiPayment] Payment ${paymentId} was already approved. Proceeding.`);
+          return responseBody.payment;
+        }
+        throw new Error(`Failed to approve Pi payment: ${JSON.stringify(responseBody)}`);
       }
 
-      return await approveResponse.json();
+      return responseBody;
     } catch (error) {
       console.error("Pi payment approval failed:", error);
       throw error;
