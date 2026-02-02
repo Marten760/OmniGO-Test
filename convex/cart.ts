@@ -21,11 +21,10 @@ export const getCartItems = query({
     // Efficiently fetch all product details in one go to avoid N+1 queries.
     const productIds = [...new Set(cartItems.map(item => item.productId))]; // Deduplicate IDs
     // Select specific fields to ensure `imageId` is included and for efficiency.
-    const products = await ctx.db
-      .query("products")
-      .filter(q => q.or(...productIds.map(id => q.eq(q.field("_id"), id))))
-      .collect();
-    const productsById = new Map(products.map(p => [p._id, p]));
+    const products = await Promise.all(productIds.map((id) => ctx.db.get(id)));
+    const productsById = new Map(
+      products.filter((p) => p !== null).map((p) => [p!._id, p!])
+    );
 
     // Enrich cart items with product details
     return Promise.all(
