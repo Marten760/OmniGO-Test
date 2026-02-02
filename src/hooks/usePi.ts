@@ -17,11 +17,13 @@ export interface PiUser {
   walletAddress?: string;
 }
 
+const PI_USER_STORAGE_KEY = 'piUser';
+
 export const usePi = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [user, setUser] = useState<PiUser | null>(() => {
     try {
-      const storedUser = localStorage.getItem('piUser');
+      const storedUser = localStorage.getItem(PI_USER_STORAGE_KEY);
       return storedUser ? JSON.parse(storedUser) : null;
     } catch (error) {
       console.error('Failed to load piUser from localStorage:', error);
@@ -115,7 +117,7 @@ export const usePi = () => {
   // Add this useEffect to detect changes in localStorage (for reloads)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'piUser') {
+      if (e.key === PI_USER_STORAGE_KEY) {
         const newUser = e.newValue ? JSON.parse(e.newValue) : null;
         console.log('[usePi] localStorage piUser changed (reload?):', newUser ? newUser.uid : 'null');
         setUser(newUser);
@@ -155,7 +157,7 @@ export const usePi = () => {
       }
 
       setUser(updatedUser);
-      localStorage.setItem('piUser', JSON.stringify(updatedUser)); // Save immediately to localStorage
+      localStorage.setItem(PI_USER_STORAGE_KEY, JSON.stringify(updatedUser)); // Save immediately to localStorage
       console.log('[usePi] Auth success, wallet:', updatedUser.walletAddress ? 'saved' : 'still missing');
 
       // The original authResult is returned, but the internal state is updated.
@@ -187,7 +189,7 @@ export const usePi = () => {
       if (authResult.user.walletAddress && authResult.user.walletAddress !== user.walletAddress) {
         const updatedUser = { ...user, walletAddress: authResult.user.walletAddress };
         setUser(updatedUser);
-        localStorage.setItem('piUser', JSON.stringify(updatedUser));
+        localStorage.setItem(PI_USER_STORAGE_KEY, JSON.stringify(updatedUser));
       }
       console.log('[Pi Auth] Re-auth success, token length:', authResult.accessToken ? authResult.accessToken.length : 'null');
       return authResult.accessToken;
@@ -268,7 +270,7 @@ export const usePi = () => {
     setUser(null);
     setAuthError(null);
     try {
-      localStorage.removeItem('piUser');
+      localStorage.removeItem(PI_USER_STORAGE_KEY);
     } catch (error) {
       console.error('Failed to remove piUser from localStorage:', error);
     }
