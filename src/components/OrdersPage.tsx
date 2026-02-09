@@ -4,6 +4,7 @@ import { useCart, type CartItem } from "../context/CartContext";
 import { Cart } from "./Cart";
 import { AddReview } from "./AddReview";
 import { formatPiPrice } from "../lib/utils";
+import { useLanguage } from "../context/LanguageContext";
 import { Clock, MapPin, Star, Package, Loader2, Check, X, AlertTriangle, Upload, ShieldAlert, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { useState, Fragment, useMemo, useEffect } from "react";
@@ -63,6 +64,7 @@ export function OrdersPage({ onNavigateToChat }: { onNavigateToChat?: (conversat
   const [processingOrders, setProcessingOrders] = useState<Set<string>>(new Set());
   const [reportingOrder, setReportingOrder] = useState<Doc<"orders"> | null>(null);
   const confirmReceiptMutation = useMutation(api.orders.confirmOrderReceipt);
+  const { t } = useLanguage();
   const createDisputeMutation = useMutation(api.orders.createDispute);
   const generateUploadUrl = useMutation(api.stores.generateUploadUrl);
   const [activeChatId, setActiveChatId] = useState<Id<"conversations"> | null>(null);

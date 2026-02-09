@@ -3,6 +3,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../hooks/useAuth';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { useLanguage } from '../context/LanguageContext';
 
 interface BottomNavigationProps {
   currentView: string;
@@ -12,6 +13,7 @@ interface BottomNavigationProps {
 
 export function BottomNavigation({ currentView, setCurrentView, onResetChat }: BottomNavigationProps) {
   const { user, sessionToken } = useAuth();
+  const { t } = useLanguage();
   const { getTotalItems } = useCart();
 
   const conversations = useQuery(
@@ -29,20 +31,20 @@ export function BottomNavigation({ currentView, setCurrentView, onResetChat }: B
   const isDriverMode = user?.profile?.activeRole === 'driver';
 
   const generalNavItems = [
-    { icon: Home, label: 'Home', view: 'home' },
-    { icon: ShoppingBag, label: 'Orders', view: 'orders' },
-    { icon: MessageSquare, label: 'Chats', view: 'chats' },
-    { icon: User, label: 'Account', view: 'account' },
+    { icon: Home, label: t('nav.home'), view: 'home' },
+    { icon: ShoppingBag, label: t('nav.orders'), view: 'orders' },
+    { icon: MessageSquare, label: t('nav.chats'), view: 'chats' },
+    { icon: User, label: t('nav.account'), view: 'account' },
   ];
 
   if (hasStore) {
-    generalNavItems.splice(3, 0, { icon: Store, label: 'Dashboard', view: 'dashboard' });
+    generalNavItems.splice(3, 0, { icon: Store, label: t('nav.dashboard'), view: 'dashboard' });
   }
 
   const driverNavItems = [
-    { icon: Truck, label: 'Deliveries', view: 'delivery' },
-    { icon: MessageSquare, label: 'Chats', view: 'chats' },
-    { icon: User, label: 'Account', view: 'account' },
+    { icon: Truck, label: t('nav.deliveries'), view: 'delivery' },
+    { icon: MessageSquare, label: t('nav.chats'), view: 'chats' },
+    { icon: User, label: t('nav.account'), view: 'account' },
   ];
 
   const navItems = isDriverMode ? driverNavItems : generalNavItems;

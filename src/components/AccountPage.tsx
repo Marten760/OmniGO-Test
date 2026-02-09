@@ -38,6 +38,7 @@ import { ReviewsView } from "./Account/ReviewsView";
 import { HelpAndSupportView } from "./Account/HelpAndSupportView";
 import { SettingsView } from "./Account/SettingsView";
 import { toast } from "sonner";
+import { useLanguage } from "../context/LanguageContext";
 
 const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
   <div className={`bg-gray-800 border border-gray-700 rounded-2xl ${className}`}>{children}</div>
@@ -60,6 +61,7 @@ type AccountPageProps = {
 
 export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProduct, onLogout, initialSubView = 'main', initialNotificationTab = "orders" }: AccountPageProps) {
   const { sessionToken, user } = useAuth();
+  const { t } = useLanguage();
   const orderStats = useQuery(api.orders.getUserOrderStats, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
   const avgRating = useQuery(api.reviews.getUserAverageRating, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
   const hasStore = useQuery(api.stores.checkUserHasStore, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
@@ -113,18 +115,18 @@ export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProdu
 
   const menuItems = useMemo(() => {
     return [
-      { icon: User, title: "Profile Information", description: "Update your personal details", action: () => setActiveSubView('profile') },
-      { icon: Bell, title: "Notifications", description: "Order updates and promotions", action: () => setActiveSubView('notifications') },
-      { icon: MapPin, title: "Addresses", description: "Manage delivery locations", action: () => setActiveSubView('addresses') },
-      { icon: Heart, title: "Favorites", description: "Your saved stores", action: () => setActiveSubView('favorites') },
-      { icon: Star, title: "Reviews & Ratings", description: "Your store reviews", action: () => setActiveSubView('reviews') },
-      { icon: Receipt, title: "Order History", description: "View past orders", action: () => setCurrentView("orders") },
-      { icon: LayoutDashboard, title: "Store Dashboard", description: "Manage your store or create a new one", action: () => setCurrentView('dashboard') },
-      { icon: FileText, title: "Privacy Policy", description: "How we handle your data", action: () => setCurrentView("privacy") },
-      { icon: ShieldCheck, title: "Terms of Service", description: "Our terms and conditions", action: () => setCurrentView("terms") },
-      { icon: Settings, title: "Settings", description: "App preferences", action: () => setActiveSubView('settings') }
+      { icon: User, title: t('account.profile'), description: "Update your personal details", action: () => setActiveSubView('profile') },
+      { icon: Bell, title: t('account.notifications'), description: "Order updates and promotions", action: () => setActiveSubView('notifications') },
+      { icon: MapPin, title: t('account.addresses'), description: "Manage delivery locations", action: () => setActiveSubView('addresses') },
+      { icon: Heart, title: t('account.favorites'), description: "Your saved stores", action: () => setActiveSubView('favorites') },
+      { icon: Star, title: t('account.reviews'), description: "Your store reviews", action: () => setActiveSubView('reviews') },
+      { icon: Receipt, title: t('account.history'), description: "View past orders", action: () => setCurrentView("orders") },
+      { icon: LayoutDashboard, title: t('account.store_dashboard'), description: "Manage your store or create a new one", action: () => setCurrentView('dashboard') },
+      { icon: FileText, title: t('account.privacy'), description: "How we handle your data", action: () => setCurrentView("privacy") },
+      { icon: ShieldCheck, title: t('account.terms'), description: "Our terms and conditions", action: () => setCurrentView("terms") },
+      { icon: Settings, title: t('account.settings'), description: "App preferences", action: () => setActiveSubView('settings') }
     ];
-  }, [setActiveSubView, setCurrentView]);
+  }, [setActiveSubView, setCurrentView, t]);
 
   // Loading state while user data is being fetched
   if (user === undefined) {
@@ -260,7 +262,7 @@ export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProdu
                     <div className="flex items-center gap-3">
                       <Truck className={`h-6 w-6 transition-colors ${isDriverModeActive ? 'text-purple-400' : 'text-gray-500'}`} />
                       <div>
-                        <Label htmlFor="driver-mode-switch" className="font-semibold text-white text-base cursor-pointer">Driver Mode</Label>
+                        <Label htmlFor="driver-mode-switch" className="font-semibold text-white text-base cursor-pointer">{t('account.driver_mode')}</Label>
                         <p className="text-sm text-gray-400">Switch to manage your deliveries</p>
                       </div>
                     </div>
@@ -335,7 +337,7 @@ export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProdu
                   <div className="w-full p-4 h-auto justify-start items-center flex text-left">
                     <div className="flex items-center">
                       <LogOut className="h-5 w-5 text-red-400 mr-4 flex-shrink-0" />
-                      <div className="font-medium text-red-400">Sign Out</div>
+                      <div className="font-medium text-red-400">{t('account.signout')}</div>
                     </div>
                   </div>
                 </SignOutButton>

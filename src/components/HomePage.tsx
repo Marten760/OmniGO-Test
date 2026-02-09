@@ -3,6 +3,7 @@ import { LocationSelector } from "./LocationSelector";
 import { SearchBar } from "./SearchBar";
 import { FilterBar } from "./FilterBar";
 import { StoreList } from "./StoreList";
+import { useLanguage } from "../context/LanguageContext";
 import { useDebounce } from "../hooks/useDebounce";
 
 interface HomePageProps {
@@ -39,6 +40,7 @@ export function HomePage({
   setSelectedStore,
   setSelectedProduct,
 }: HomePageProps) {
+  const { t } = useLanguage();
   const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce search term by 300ms
 
   return (

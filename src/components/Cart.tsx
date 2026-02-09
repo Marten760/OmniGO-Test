@@ -11,6 +11,7 @@ import { DiscountCodeInput } from './DiscountCodeInput';
 import { formatPiPrice } from '../lib/utils';
 import { useAuth } from '../hooks/useAuth';
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { useLanguage } from '../context/LanguageContext';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "./ui/command";
 import { usePi } from '../hooks/usePi';  // Add this to directly access isInitialized/user for logs
 
@@ -51,6 +52,7 @@ export function Cart({
   const [isAddressPopoverOpen, setIsAddressPopoverOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const { sessionToken, user: authUser } = useAuth();
+  const { t } = useLanguage();
   const { isInitialized, user: piUser } = usePi();  // Add this for logs
 
   const user = useQuery(api.auth.getUserFromToken, sessionToken ? { tokenIdentifier: sessionToken } : "skip");
@@ -390,7 +392,7 @@ export function Cart({
                   {/* Summary Header with Toggle */}
                   <div className="flex justify-between items-center mb-4 cursor-pointer" onClick={() => setShowSummaryDetails(!showSummaryDetails)}>
                     <h3 className="text-xl font-bold text-white">Order Summary</h3>
-                    <button className="text-gray-400 hover:text-white">
+  <button className="text-gray-400 hover:text-white">
                       {showSummaryDetails ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                     </button>
                   </div>
@@ -407,7 +409,7 @@ export function Cart({
                       >
                         <div className="space-y-4 pt-4">
                           <div className="space-y-2">
-                            <div className="flex justify-between text-sm text-gray-300">
+  <div className="flex justify-between text-sm text-gray-300">
                               <span>Subtotal</span>
                               <span className="font-mono">{formatPiPrice(subtotal)}</span>
                             </div>
@@ -422,7 +424,7 @@ export function Cart({
                                 <span className="font-mono">-{formatPiPrice(discountAmount)}</span>
                               </div>
                             )}
-                            <div className="flex justify-between text-sm text-gray-300">
+  <div className="flex justify-between text-sm text-gray-300">
                               <span>Delivery Fee {dynamicDeliveryFee !== undefined && dynamicDeliveryFee !== null && <span className="text-xs text-purple-400 ml-1">(Dynamic)</span>}</span>
                               {deliveryFee === null ? (
                                 <span className="font-mono animate-pulse">...</span>
@@ -463,12 +465,12 @@ export function Cart({
                                                 <span className="font-semibold">{selectedAddress.label}</span>
                                                 <span className="text-xs text-gray-400">{selectedAddress.address}, {selectedAddress.city}</span>
                                             </div>
-                                        ) : "Select an address"}
+                                        ) : t("select")}
                                         <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[300px] p-0 bg-gray-900 border-gray-700 text-white">
-                                        <Command className="bg-gray-900 text-white rounded-lg">
+ <Command className="bg-gray-900 text-white rounded-lg">
                                             <CommandInput placeholder=" Search address..." className="h-9 border-gray-700 bg-gray-800 text-white focus:ring-purple-500" />
                                             <CommandEmpty>No address found.</CommandEmpty>
                                             <CommandGroup className="max-h-40 overflow-y-auto">
@@ -561,7 +563,7 @@ export function Cart({
                       disabled={!deliveryAddress.trim() || subtotal === 0 || !storeId || inventoryIssues.length > 0 || isCheckingInventory || !deliveryValidation.allowed}
                     >
                       <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 font-semibold text-center shadow-lg hover:scale-105 active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100">
-                        {subtotal > 0 ? `Pay ${formatPiPrice(total)} with Pi Wallet` : 'Add items to cart'}
+                         {subtotal > 0 ? `${t('payWithPi')} ${formatPiPrice(total)} ` : 'Add items to cart'}
                       </div>
                     </PiPayment>
                   </div>
