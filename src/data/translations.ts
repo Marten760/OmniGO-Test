@@ -42,6 +42,17 @@ export const translations = {
     "deliveryFee": "Delivery Fee",
     "total": "Total",
     "payWithPi": "Pay with Pi Wallet",
+    "location.detected": "Location detected! Showing nearby stores.",
+    "action.setLocation": "Action Required: Set Location",
+    "action.linkWallet": "Action Required: Link Wallet",
+    "error.outOfCountry": "Out of Delivery Country",
+    "error.outOfZone": "Out of Delivery Zone",
+    "error.missingLocation": "Please update your profile with your Country and City to place orders.",
+    "error.missingWallet": "Please link your Pi Wallet address to ensure you can receive refunds.",
+    "error.storeCountry": "This store only delivers within",
+    "error.storeZone": "This store does not deliver to",
+    "action.updateProfile": "Update Profile Now",
+    "action.linkWalletNow": "Link Wallet Now",
   },
   ar: {
     // Navigation
@@ -86,6 +97,17 @@ export const translations = {
     "deliveryFee": "رسوم التوصيل",
     "total": "المجموع",
     "payWithPi": "ادفع باستخدام محفظة Pi",
+    "location.detected": "تم تحديد الموقع! جاري عرض المتاجر القريبة.",
+    "action.setLocation": "إجراء مطلوب: تحديد الموقع",
+    "action.linkWallet": "إجراء مطلوب: ربط المحفظة",
+    "error.outOfCountry": "خارج دولة التوصيل",
+    "error.outOfZone": "خارج منطقة التوصيل",
+    "error.missingLocation": "يرجى تحديث ملفك الشخصي بالدولة والمدينة لطلب الطلبات.",
+    "error.missingWallet": "يرجى ربط عنوان محفظة Pi الخاصة بك لضمان استلام المبالغ المستردة.",
+    "error.storeCountry": "هذا المتجر يوصل فقط داخل",
+    "error.storeZone": "هذا المتجر لا يوصل إلى",
+    "action.updateProfile": "تحديث الملف الشخصي الآن",
+    "action.linkWalletNow": "ربط المحفظة الآن",
   }
 };
 

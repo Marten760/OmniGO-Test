@@ -26,6 +26,7 @@ import { usePushNotifications } from "./hooks/usePushNotifications";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "./components/ui/button";
+import { useLanguage } from "./context/LanguageContext";
 
 interface AppContentProps {
   sessionToken: string | null;
@@ -58,6 +59,7 @@ export function AppContent({
     rating: 0,
   });
   const [legalView, setLegalView] = useState<"privacy" | "terms" | null>(null);
+  const { t } = useLanguage();
 
   const { pendingItem, proceedWithNewItem, cancelAddItem } = useCart();
   const updatePresence = useMutation(api.presence.update);
@@ -194,7 +196,7 @@ export function AppContent({
   };
 
   const handleLocationDetect = () => {
-    toast.success("Location detected! Showing nearby stores.");
+    toast.success(t("location.detected"));
   };
 
   // ---------------------------------------------------------------------------
@@ -426,23 +428,23 @@ export function AppContent({
                 <div className="flex-1">
                     <h4 className="font-bold text-lg flex items-center justify-center sm:justify-start gap-2">
                         <AlertTriangle className="w-6 h-6 text-yellow-300" />
-                        {deliveryStatus.status === 'missing_location' && "Action Required: Set Location"}
-                        {deliveryStatus.status === 'missing_wallet' && "Action Required: Link Wallet"}
-                        {deliveryStatus.status === 'invalid_country' && "Out of Delivery Country"}
-                        {deliveryStatus.status === 'invalid_region' && "Out of Delivery Zone"}
+                        {deliveryStatus.status === 'missing_location' && t("action.setLocation")}
+                        {deliveryStatus.status === 'missing_wallet' && t("action.linkWallet")}
+                        {deliveryStatus.status === 'invalid_country' && t("error.outOfCountry")}
+                        {deliveryStatus.status === 'invalid_region' && t("error.outOfZone")}
                     </h4>
                     <p className="text-sm text-red-100 mt-1">
-                        {deliveryStatus.status === 'missing_location' && "Please update your profile with your Country and City to place orders."}
-                        {deliveryStatus.status === 'missing_wallet' && "Please link your Pi Wallet address to ensure you can receive refunds."}
+                        {deliveryStatus.status === 'missing_location' && t("error.missingLocation")}
+                        {deliveryStatus.status === 'missing_wallet' && t("error.missingWallet")}
                         {/* @ts-ignore */}
-                        {deliveryStatus.status === 'invalid_country' && `This store only delivers within ${deliveryStatus.storeCountry}.`}
+                        {deliveryStatus.status === 'invalid_country' && `${t("error.storeCountry")} ${deliveryStatus.storeCountry}.`}
                         {/* @ts-ignore */}
-                        {deliveryStatus.status === 'invalid_region' && `This store does not deliver to ${deliveryStatus.city}.`}
+                        {deliveryStatus.status === 'invalid_region' && `${t("error.storeZone")} ${deliveryStatus.city}.`}
                     </p>
                 </div>
                 {(deliveryStatus.status === 'missing_location' || deliveryStatus.status === 'missing_wallet') && (
                     <Button onClick={() => setCurrentView(deliveryStatus.status === 'missing_location' ? 'account_addresses' : 'account_profile')} variant="secondary" size="sm" className="whitespace-nowrap bg-white text-red-600 hover:bg-gray-100 font-bold shadow-lg">
-                        {deliveryStatus.status === 'missing_location' ? "Update Profile Now" : "Link Wallet Now"}
+                        {deliveryStatus.status === 'missing_location' ? t("action.updateProfile") : t("action.linkWalletNow")}
                     </Button>
                 )}
             </div>
