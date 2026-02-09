@@ -91,6 +91,26 @@ export function AccountPage({ setCurrentView, setSelectedStore, setSelectedProdu
     }
   };
   
+  // ---------------------------------------------------------------------------
+  // FIX: Handle browser back button for account sub-views
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (activeSubView !== 'main') {
+        setActiveSubView('main');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeSubView]);
+
+  useEffect(() => {
+    if (activeSubView !== 'main') {
+      window.history.pushState({ type: 'account_subview', view: activeSubView }, '');
+    }
+  }, [activeSubView]);
+  // ---------------------------------------------------------------------------
+
   const menuItems = useMemo(() => {
     return [
       { icon: User, title: "Profile Information", description: "Update your personal details", action: () => setActiveSubView('profile') },
