@@ -197,6 +197,54 @@ export function AppContent({
     toast.success("Location detected! Showing nearby stores.");
   };
 
+  // ---------------------------------------------------------------------------
+  // FIX: Handle browser back button for mobile devices
+  // This prevents the app from exiting when the user presses "Back" in a sub-view
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      // Close overlays in reverse priority order
+      if (selectedProduct) {
+        setSelectedProduct(null);
+        return;
+      }
+      if (legalView) {
+        setLegalView(null);
+        return;
+      }
+      if (selectedConversationId) {
+        setSelectedConversationId(null);
+        // If we were in the dedicated chat view, go back to chats list
+        if (currentView === 'chat') {
+           setCurrentView('chats');
+        }
+        return;
+      }
+      if (selectedStore) {
+        setSelectedStore(null);
+        return;
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedProduct, legalView, selectedConversationId, selectedStore, currentView]);
+
+  // Push history entries when opening overlays so "Back" has something to pop
+  useEffect(() => {
+    if (selectedStore) window.history.pushState({ type: 'store' }, '');
+  }, [selectedStore]);
+  useEffect(() => {
+    if (selectedConversationId) window.history.pushState({ type: 'chat' }, '');
+  }, [selectedConversationId]);
+  useEffect(() => {
+    if (selectedProduct) window.history.pushState({ type: 'product' }, '');
+  }, [selectedProduct]);
+  useEffect(() => {
+    if (legalView) window.history.pushState({ type: 'legal' }, '');
+  }, [legalView]);
+  // ---------------------------------------------------------------------------
+
   // Animation variants for page transitions
   const pageVariants = {
     initial: {
